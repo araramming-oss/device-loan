@@ -1,0 +1,2678 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기기 대여 관리 시스템</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --navy: #1E3A5F;
+    --blue: #1A73E8;
+    --lt-blue: #E8F0FE;
+    --green: #1E8449;
+    --lt-green: #E9F7EF;
+    --red: #C0392B;
+    --lt-red: #FDEDEC;
+    --amber: #B7770D;
+    --lt-amber: #FEF9E7;
+    --purple: #6C3483;
+    --lt-purple: #F4ECF7;
+    --gray: #F8F9FA;
+    --mid-gray: #DEE2E6;
+    --dark: #212529;
+    --text-muted: #6C757D;
+    --white: #FFFFFF;
+    --sidebar-w: 220px;
+    --header-h: 56px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: #F0F2F5; color: var(--dark); font-size: 14px; }
+
+  /* Layout */
+  .sidebar { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh; background: var(--navy); display: flex; flex-direction: column; z-index: 100; }
+  .sidebar-logo { padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sidebar-logo h1 { font-size: 15px; font-weight: 700; color: white; line-height: 1.3; }
+  .sidebar-logo p { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+  .nav-section { font-size: 10px; color: rgba(255,255,255,0.35); padding: 12px 20px 4px; letter-spacing: 0.8px; text-transform: uppercase; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 500; transition: all 0.15s; border-left: 3px solid transparent; }
+  .nav-item:hover { background: rgba(255,255,255,0.08); color: white; }
+  .nav-item.active { background: rgba(255,255,255,0.12); color: white; border-left-color: #60A5FA; }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+  .main { margin-left: var(--sidebar-w); min-height: 100vh; }
+  .topbar { background: white; border-bottom: 1px solid var(--mid-gray); padding: 0 24px; height: var(--header-h); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  .topbar-title { font-size: 16px; font-weight: 700; color: var(--navy); }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .content { padding: 24px; }
+
+  /* Cards */
+  .card { background: white; border-radius: 12px; border: 1px solid var(--mid-gray); overflow: hidden; }
+  .card-header { padding: 16px 20px; border-bottom: 1px solid var(--mid-gray); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .card-body { padding: 20px; }
+
+  /* KPI Grid */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .kpi { background: white; border-radius: 12px; padding: 16px 20px; border: 1px solid var(--mid-gray); }
+  .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 700; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; font-family: inherit; transition: all 0.15s; }
+  .btn-primary { background: var(--blue); color: white; }
+  .btn-primary:hover { background: #1557B0; }
+  .btn-success { background: var(--green); color: white; }
+  .btn-success:hover { background: #166038; }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-danger:hover { opacity: 0.85; }
+  .btn-outline { background: white; color: var(--dark); border: 1px solid var(--mid-gray); }
+  .btn-outline:hover { background: var(--gray); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+  /* Badge */
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-available { background: var(--lt-green); color: var(--green); }
+  .badge-lent { background: var(--lt-blue); color: var(--blue); }
+  .badge-overdue { background: var(--lt-red); color: var(--red); }
+  .badge-repair { background: var(--lt-amber); color: var(--amber); }
+  .badge-returned { background: #E9ECEF; color: #495057; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--gray); border-bottom: 1px solid var(--mid-gray); white-space: nowrap; }
+  td { padding: 12px 14px; border-bottom: 1px solid #F0F2F5; font-size: 13px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #FAFBFC; }
+
+  /* Forms */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  input, select, textarea { padding: 9px 12px; border: 1px solid var(--mid-gray); border-radius: 8px; font-size: 13px; font-family: inherit; color: var(--dark); background: white; transition: border-color 0.15s; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,115,232,0.1); }
+  textarea { resize: vertical; min-height: 70px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 16px; width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
+  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--mid-gray); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 16px; font-weight: 700; color: var(--navy); }
+  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); line-height: 1; }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--mid-gray); display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; background: var(--gray); border-radius: 10px; padding: 4px; margin-bottom: 20px; }
+  .tab { padding: 7px 16px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-muted); border: none; background: none; font-family: inherit; transition: all 0.15s; }
+  .tab.active { background: white; color: var(--navy); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+  /* Search */
+  .search-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .search-input { flex: 1; min-width: 180px; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--dark); color: white; padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 999; transform: translateY(80px); opacity: 0; transition: all 0.3s; pointer-events: none; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { background: var(--green); }
+  .toast.error { background: var(--red); }
+
+  /* Sections */
+  .page { display: none; }
+  .page.active { display: block; }
+  .section-gap { display: flex; flex-direction: column; gap: 20px; }
+  .row { display: flex; gap: 20px; }
+  .col { flex: 1; min-width: 0; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .empty p { font-size: 13px; }
+
+  /* Loading */
+  .loading { text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px; }
+
+  /* Config screen */
+  .config-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #F0F2F5; }
+  .config-card { background: white; border-radius: 16px; padding: 40px; width: 480px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .config-card h2 { font-size: 20px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .config-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.6; }
+  .config-card .form-group { margin-bottom: 14px; }
+
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .main { margin-left: 0; }
+    .form-grid { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .search-dropdown-item { padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:0.5px solid var(--gray); }
+  .search-dropdown-item:last-child { border-bottom:none; }
+  .search-dropdown-item:hover { background:var(--lt-blue); }
+  .search-dropdown-item .item-id { font-size:11px; color:var(--text-muted); font-family:monospace; }
+  .search-dropdown-item .item-badge { font-size:10px; padding:2px 6px; border-radius:10px; margin-left:6px; }
+</style>
+</head>
+<body>
+
+<!-- Config Screen -->
+<div class="config-screen" id="configScreen">
+  <div class="config-card">
+    <h2>🖥️ 기기 대여 관리 시스템</h2>
+    <p>Supabase 연결 정보를 입력해주세요.<br>한 번 입력하면 브라우저에 저장돼서 다음부터는 자동으로 연결돼요.</p>
+    <div class="form-group">
+      <label>Supabase URL</label>
+      <input type="text" id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" />
+    </div>
+    <div class="form-group">
+      <label>Publishable Key (anon public)</label>
+      <input type="text" id="cfgKey" placeholder="sb_publishable_..." />
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px;" onclick="connectSupabase()">연결하기</button>
+    <p style="margin-top:12px;font-size:11px;color:#aaa;text-align:center;">입력한 정보는 이 기기의 브라우저에만 저장됩니다.</p>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" style="display:none;">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h1>🖥️ 기기 대여<br>관리 시스템</h1>
+      <p>학교 기기 대여 플랫폼</p>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">메인</div>
+      <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span> 대시보드</div>
+      <div class="nav-section">기기 관리</div>
+      <div class="nav-item" onclick="showPage('devices')"><span class="icon">💻</span> 전체 기기</div>
+      <div class="nav-item" onclick="showPage('notebooks')"><span class="icon">🖥️</span> 노트북</div>
+      <div class="nav-item" onclick="showPage('tablets')"><span class="icon">📱</span> 태블릿</div>
+      <div class="nav-item" onclick="showPage('tabletKo')"><span class="icon">📲</span> 타블렛</div>
+      <div class="nav-item" onclick="showPage('webcams')"><span class="icon">📷</span> 웹캠</div>
+      <div class="nav-item" onclick="showPage('monitors')"><span class="icon">🖥️</span> 포터블모니터</div>
+      <div class="nav-item" onclick="showPage('others')"><span class="icon">🔌</span> 기타기기</div>
+      <div class="nav-section">대여 관리</div>
+      <div class="nav-item" onclick="showPage('loans')"><span class="icon">📋</span> 대여현황</div>
+      <div class="nav-item" onclick="showPage('overdue')"><span class="icon">⚠️</span> 연체현황</div>
+      <div class="nav-section">인원 관리</div>
+      <div class="nav-item" onclick="showPage('students')"><span class="icon">👤</span> 학생</div>
+      <div class="nav-item" onclick="showPage('staff')"><span class="icon">👩‍🏫</span> 교사·교직원</div>
+      <div class="nav-section">공간 관리</div>
+      <div class="nav-item" onclick="showPage('rooms')"><span class="icon">🏫</span> 실습실·특별실</div>
+      <div class="nav-section">바코드 스캔</div>
+      <div class="nav-item" onclick="showPage('scan')"><span class="icon">📷</span> 빠른 대여/반납</div>
+      <div class="nav-section">일괄 등록</div>
+      <div class="nav-item" onclick="showPage('bulk')"><span class="icon">📥</span> 일괄 입력/업로드</div>
+    </nav>
+    <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.1);">
+      <div style="font-size:11px;color:rgba(255,255,255,0.35);">연결됨 · Supabase</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="pageTitle">대시보드</div>
+      <div class="topbar-right">
+        <button class="btn btn-primary btn-sm" id="topAddBtn" onclick="openAddModal()" style="display:none">+ 추가</button>
+        <button class="btn btn-success btn-sm" id="lendBtn" onclick="openLoanModal()" style="display:none">📋 대여 등록</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- 대시보드 -->
+      <div class="page active" id="page-dashboard">
+        <div class="kpi-grid" id="kpiGrid">
+          <div class="kpi"><div class="kpi-label">전체 기기</div><div class="kpi-value" id="kpi-total">-</div></div>
+          <div class="kpi"><div class="kpi-label">대여 가능</div><div class="kpi-value" style="color:var(--green)" id="kpi-available">-</div></div>
+          <div class="kpi"><div class="kpi-label">대여 중</div><div class="kpi-value" style="color:var(--blue)" id="kpi-lent">-</div></div>
+          <div class="kpi"><div class="kpi-label">연체</div><div class="kpi-value" style="color:var(--red)" id="kpi-overdue">-</div></div>
+          <div class="kpi"><div class="kpi-label">분실</div><div class="kpi-value" style="color:var(--red)" id="kpi-lost">-</div></div>
+          <div class="kpi"><div class="kpi-label">등록 학생</div><div class="kpi-value" style="color:var(--purple)" id="kpi-students">-</div></div>
+          <div class="kpi"><div class="kpi-label">교사·교직원</div><div class="kpi-value" style="color:var(--amber)" id="kpi-staff">-</div></div>
+        </div>
+        <!-- 종류별 현황 -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header"><div class="card-title">📊 기기 종류별 현황</div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>종류</th><th style="text-align:center;color:var(--green)">대여가능</th><th style="text-align:center;color:var(--blue)">대여중</th><th style="text-align:center;color:var(--red)">연체</th><th style="text-align:center;color:var(--amber)">수리중</th><th style="text-align:center;color:var(--red)">분실</th><th style="text-align:center">합계</th></tr></thead>
+              <tbody id="categoryStatTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="card">
+              <div class="card-header"><div class="card-title">⚠️ 연체 기기</div></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>기기</th><th>대여자</th><th>반납예정일</th><th>연체일수</th><th></th></tr></thead>
+                <tbody id="overdueTableDash"></tbody>
+              </table></div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card">
+              <div class="card-header"><div class="card-title">📋 최근 대여</div></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>기기</th><th>대여자</th><th>대여일</th><th>상태</th></tr></thead>
+                <tbody id="recentLoansTable"></tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 기기 공통 페이지 -->
+      <div class="page" id="page-devices">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="기기명, 제조사, 모델명 검색..." oninput="filterDevices(this.value,'all')" />
+          <select onchange="filterDeviceStatus(this.value,'all')">
+            <option value="">전체 상태</option>
+            <option value="대여가능">대여 가능</option>
+            <option value="대여중">대여 중</option>
+            <option value="연체">연체</option>
+            <option value="수리중">수리 중</option>
+            <option value="분실">분실</option>
+          </select>
+        </div>
+        <div class="card">
+          <div class="table-wrap"><table>
+            <thead><tr><th>기기ID</th><th>기기명</th><th>종류</th><th>제조사</th><th>모델명</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
+            <tbody id="deviceTableAll"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="page" id="page-notebooks">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="검색..." oninput="filterDevices(this.value,'노트북')" />
+          <select id="notebookPrefixFilter" onchange="localStorage.setItem('filter_notebooks',this.value);filterDevices(document.querySelector('#page-notebooks input').value,'노트북')">
+            <option value="">전체 ID</option>
+          </select>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
+          <tbody id="deviceTableNotebook"></tbody>
+        </table></div></div>
+      </div>
+
+      <div class="page" id="page-tablets">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="검색..." oninput="filterDevices(this.value,'태블릿')" />
+          <select id="tabletPrefixFilter" onchange="localStorage.setItem('filter_tablets',this.value);filterDevices(document.querySelector('#page-tablets input').value,'태블릿')">
+            <option value="">전체 ID</option>
+          </select>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
+          <tbody id="deviceTableTablet"></tbody>
+        </table></div></div>
+      </div>
+
+
+      <div class="page" id="page-tabletKo">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="검색..." oninput="filterDevicesCat(this.value,'타블렛')" />
+          <select id="tabletKoPrefixFilter" onchange="filterDevicesCat(document.querySelector('#page-tabletKo input').value,'타블렛')">
+            <option value="">전체 ID</option>
+          </select>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
+          <tbody id="deviceTableTabletKo"></tbody>
+        </table></div></div>
+      </div>
+
+      <div class="page" id="page-webcams">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="검색..." oninput="filterDevicesCat(this.value,'웹캠')" />
+          <select id="webcamPrefixFilter" onchange="filterDevicesCat(document.querySelector('#page-webcams input').value,'웹캠')">
+            <option value="">전체 ID</option>
+          </select>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
+          <tbody id="deviceTableWebcam"></tbody>
+        </table></div></div>
+      </div>
+
+      <div class="page" id="page-monitors">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="검색..." oninput="filterDevicesCat(this.value,'포터블모니터')" />
+          <select id="monitorPrefixFilter" onchange="filterDevicesCat(document.querySelector('#page-monitors input').value,'포터블모니터')">
+            <option value="">전체 ID</option>
+          </select>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
+          <tbody id="deviceTableMonitor"></tbody>
+        </table></div></div>
+      </div>
+      <div class="page" id="page-others">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="검색..." oninput="filterDevices(this.value,'기타전자기기')" />
+          <select id="otherPrefixFilter" onchange="filterDevices(document.querySelector('#page-others input').value,'기타전자기기')">
+            <option value="">전체 ID</option>
+          </select>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
+          <tbody id="deviceTableOther"></tbody>
+        </table></div></div>
+      </div>
+
+      <!-- 대여현황 -->
+      <div class="page" id="page-loans">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="기기명, 대여자 검색..." oninput="filterLoans(this.value)" />
+          <select id="loanCategoryFilter" onchange="localStorage.setItem('lf_cat',this.value);filterLoans(document.querySelector('#page-loans .search-input')?.value||'')">
+            <option value="">전체 종류</option>
+          </select>
+          <select id="loanBorrowerTypeFilter" onchange="localStorage.setItem('lf_type',this.value);filterLoans(document.querySelector('#page-loans .search-input')?.value||'')">
+            <option value="">학생+교직원</option>
+            <option value="student">학생만</option>
+            <option value="staff">교직원만</option>
+          </select>
+          <select id="loanStatusFilter" onchange="localStorage.setItem('lf_status',this.value);filterLoans(document.querySelector('#page-loans .search-input')?.value||'')">
+            <option value="">전체 상태</option>
+            <option value="대여중">대여 중</option>
+            <option value="연체">연체</option>
+            <option value="반납완료">반납 완료</option>
+          </select>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>대여번호</th><th>기기ID</th><th>대여자</th><th>대여일</th><th>반납예정일</th><th>상태</th><th>반납일</th><th>연체일수</th><th></th></tr></thead>
+          <tbody id="loanTable"></tbody>
+        </table></div></div>
+      </div>
+
+      <!-- 연체현황 -->
+      <div class="page" id="page-overdue">
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>대여번호</th><th>기기</th><th>대여자</th><th>반납예정일</th><th>연체일수</th><th>연락처</th><th></th></tr></thead>
+          <tbody id="overdueTable"></tbody>
+        </table></div></div>
+      </div>
+
+      <!-- 학생 -->
+      <div class="page" id="page-students">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="이름, 표시이름, 학번 검색..." oninput="filterStudents(this.value)" />
+          <button class="btn btn-danger btn-sm" id="stuBulkDelBtn" style="display:none" onclick="bulkDelete('student')">🗑️ 선택 삭제 (<span id="stuSelCount">0</span>명)</button>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th style="width:36px"><input type="checkbox" onchange="toggleSelectAll('student',this.checked)" id="stuCheckAll" /></th><th>학번</th><th>이름</th><th>학년/반</th><th>상태</th><th>현재대여</th><th></th></tr></thead>
+          <tbody id="studentTable"></tbody>
+        </table></div></div>
+      </div>
+
+      <!-- 일괄 등록 -->
+      <div class="page" id="page-bulk">
+        <div class="section-gap">
+
+          <!-- 탭 -->
+          <div class="tabs" id="bulkTabs">
+            <button class="tab active" onclick="switchBulkTab('device')">💻 기기 일괄 등록</button>
+            <button class="tab" onclick="switchBulkTab('student')">👤 학생 일괄 등록</button>
+            <button class="tab" onclick="switchBulkTab('staff')">👩‍🏫 교직원 일괄 등록</button>
+            <button class="tab" onclick="switchBulkTab('loan')">📋 대여 내역 일괄 등록</button>
+          </div>
+
+          <!-- 기기 일괄 -->
+          <div id="bulk-device">
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header">
+                <div class="card-title">📥 엑셀/CSV 파일 업로드</div>
+              </div>
+              <div class="card-body">
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">아래 양식에 맞춰 엑셀 또는 CSV 파일을 업로드하면 한 번에 등록돼요.</p>
+                <div style="background:var(--gray);border-radius:8px;padding:12px 16px;font-size:12px;font-family:monospace;margin-bottom:14px;color:var(--dark);">
+                  기기ID, 기기명, 제조사, 모델명, 라벨번호, 상태, 구매일<br>
+                  NSS025, 삼성노트북-025, 노트북, 삼성, , 20200221-NSS025, 대여가능, 2026-03-20
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                  <input type="file" id="deviceCsvFile" accept=".csv,.xlsx,.xls" style="font-size:13px;" onchange="previewBulkFile('device')" />
+                  <button class="btn btn-outline btn-sm" onclick="downloadTemplate('device')">📄 양식 다운로드</button>
+                </div>
+                <div id="deviceFilePreview" style="margin-top:14px;display:none;">
+                  <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:8px;" id="devicePreviewCount"></div>
+                  <div class="table-wrap" style="max-height:200px;overflow-y:auto;">
+                    <table><thead><tr><th>기기ID</th><th>기기명</th><th>종류</th><th>제조사</th><th>모델명</th><th>상태</th></tr></thead>
+                    <tbody id="devicePreviewTable"></tbody></table>
+                  </div>
+                  <button class="btn btn-primary" style="margin-top:12px" onclick="uploadBulk('device')">⬆️ 업로드</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div class="card-title">✏️ 직접 입력 (여러 줄)</div></div>
+              <div class="card-body">
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">한 줄에 하나씩 <code style="background:var(--gray);padding:2px 5px;border-radius:4px">쉼표(,)</code>로 구분해서 입력하세요.</p>
+                <div style="background:var(--gray);border-radius:8px;padding:10px 14px;font-size:12px;font-family:monospace;margin-bottom:10px;color:var(--text-muted);">
+                  기기ID, 기기명, 제조사, 모델명, 라벨번호, 상태, 구매일
+                </div>
+                <textarea id="deviceBulkText" style="width:100%;height:160px;font-family:monospace;font-size:12px;" placeholder="NSS025, 삼성노트북-025, 삼성, , 20200221-NSS025, 대여가능, 2026-03-20&#10;NSS026, 삼성노트북-026, 삼성, , 20200221-NSS026, 대여가능, 2026-03-20&#10;LGN001, LG노트북-001, LG, , 20200918-LGN001, 대여중, 2020-09-18"></textarea>
+                <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+                  <button class="btn btn-primary" onclick="bulkTextInput('device')">등록</button>
+                  <span id="deviceBulkResult" style="font-size:13px;color:var(--green);"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 학생 일괄 -->
+          <div id="bulk-student" style="display:none">
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header"><div class="card-title">📥 엑셀/CSV 파일 업로드</div></div>
+              <div class="card-body">
+                <div style="background:var(--gray);border-radius:8px;padding:12px 16px;font-size:12px;font-family:monospace;margin-bottom:14px;">
+                  학번, 이름, 학년/반, 상태<br>
+                  20240001, 홍길동, 2학년 1반, 재학<br>
+                  <span style="color:var(--text-muted)">(비고) 학번 없으면 빈칸 — 자동으로 TEMP-이름 으로 등록됩니다</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                  <input type="file" id="studentCsvFile" accept=".csv,.xlsx,.xls" style="font-size:13px;" onchange="previewBulkFile('student')" />
+                  <button class="btn btn-outline btn-sm" onclick="downloadTemplate('student')">📄 양식 다운로드</button>
+                </div>
+                <div id="studentFilePreview" style="margin-top:14px;display:none;">
+                  <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:8px;" id="studentPreviewCount"></div>
+                  <div class="table-wrap" style="max-height:200px;overflow-y:auto;">
+                    <table><thead><tr><th>학번</th><th>이름</th><th>학년/반</th><th>상태</th></tr></thead>
+                    <tbody id="studentPreviewTable"></tbody></table>
+                  </div>
+                  <button class="btn btn-primary" style="margin-top:12px" onclick="uploadBulk('student')">⬆️ 업로드</button>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div class="card-title">✏️ 직접 입력 (여러 줄)</div></div>
+              <div class="card-body">
+                <div style="background:var(--gray);border-radius:8px;padding:10px 14px;font-size:12px;font-family:monospace;margin-bottom:10px;color:var(--text-muted);">학번, 이름, 학년/반, 상태</div>
+                <textarea id="studentBulkText" style="width:100%;height:160px;font-family:monospace;font-size:12px;" placeholder="20240001, 홍길동, 2학년 1반, 재학&#10;20240002, 김철수, 2학년 1반, 재학&#10;20240003, 이영희, 3학년 2반, 재학"></textarea>
+                <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+                  <button class="btn btn-primary" onclick="bulkTextInput('student')">등록</button>
+                  <span id="studentBulkResult" style="font-size:13px;color:var(--green);"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 교직원 일괄 -->
+          <div id="bulk-staff" style="display:none">
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header"><div class="card-title">📥 엑셀/CSV 파일 업로드</div></div>
+              <div class="card-body">
+                <div style="background:var(--gray);border-radius:8px;padding:12px 16px;font-size:12px;font-family:monospace;margin-bottom:14px;">
+                  이름, 구분<br>
+                  김선생, 교사
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                  <input type="file" id="staffCsvFile" accept=".csv,.xlsx,.xls" style="font-size:13px;" onchange="previewBulkFile('staff')" />
+                  <button class="btn btn-outline btn-sm" onclick="downloadTemplate('staff')">📄 양식 다운로드</button>
+                </div>
+                <div id="staffFilePreview" style="margin-top:14px;display:none;">
+                  <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:8px;" id="staffPreviewCount"></div>
+                  <div class="table-wrap" style="max-height:200px;overflow-y:auto;">
+                    <table><thead><tr><th>이름</th><th>구분</th></tr></thead>
+                    <tbody id="staffPreviewTable"></tbody></table>
+                  </div>
+                  <button class="btn btn-primary" style="margin-top:12px" onclick="uploadBulk('staff')">⬆️ 업로드</button>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div class="card-title">✏️ 직접 입력 (여러 줄)</div></div>
+              <div class="card-body">
+                <div style="background:var(--gray);border-radius:8px;padding:10px 14px;font-size:12px;font-family:monospace;margin-bottom:10px;color:var(--text-muted);">이름, 구분</div>
+                <textarea id="staffBulkText" style="width:100%;height:160px;font-family:monospace;font-size:12px;" placeholder="김선생, 교사&#10;이교감, 교직원&#10;박선생, 교사"></textarea>
+                <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+                  <button class="btn btn-primary" onclick="bulkTextInput('staff')">등록</button>
+                  <span id="staffBulkResult" style="font-size:13px;color:var(--green);"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 교사·교직원 -->
+      <div class="page" id="page-staff">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="이름 검색..." oninput="filterStaff(this.value)" />
+          <button class="btn btn-danger btn-sm" id="stfBulkDelBtn" style="display:none" onclick="bulkDelete('staff')">🗑️ 선택 삭제 (<span id="stfSelCount">0</span>명)</button>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th style="width:36px"><input type="checkbox" onchange="toggleSelectAll('staff',this.checked)" id="stfCheckAll" /></th><th>이름</th><th>구분</th><th>현재대여</th><th></th></tr></thead>
+          <tbody id="staffTable"></tbody>
+        </table></div></div>
+      </div>
+
+      <!-- 실습실·특별실 -->
+      <div class="page" id="page-rooms">
+        <div class="search-bar">
+          <input class="search-input" type="text" placeholder="공간명 검색..." oninput="filterRooms(this.value)" />
+          <select onchange="filterRoomStatus(this.value)">
+            <option value="">전체 상태</option>
+            <option value="사용가능">사용 가능</option>
+            <option value="사용중">사용 중</option>
+            <option value="점검중">점검 중</option>
+          </select>
+        </div>
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>공간명</th><th>종류</th><th>수용인원</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
+          <tbody id="roomTable"></tbody>
+        </table></div></div>
+      </div>
+
+
+      <!-- 바코드 스캔 -->
+      <div class="page" id="page-scan">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+
+          <!-- 카메라 스캔 -->
+          <div class="card">
+            <div class="card-header" style="background:var(--navy)">
+              <div class="card-title" style="color:white">📷 카메라 스캔 (QR/바코드)</div>
+              <button class="btn btn-sm" id="cameraBtnToggle" style="background:rgba(255,255,255,0.15);color:white;border-color:transparent" onclick="toggleCamera()">카메라 켜기</button>
+            </div>
+            <div class="card-body" style="padding:0">
+              <div id="cameraContainer" style="display:none;position:relative;background:#000;aspect-ratio:4/3">
+                <video id="cameraVideo" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
+                <canvas id="cameraCanvas" style="display:none"></canvas>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+                  <div style="width:200px;height:140px;border:3px solid #60A5FA;border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,0.45)"></div>
+                </div>
+                <div style="position:absolute;bottom:12px;left:0;right:0;text-align:center;color:white;font-size:12px;opacity:0.8">바코드/QR을 박스 안에 맞춰주세요</div>
+              </div>
+              <div id="cameraOff" style="padding:40px;text-align:center;color:var(--text-muted)">
+                <div style="font-size:48px;margin-bottom:10px">📷</div>
+                <p style="font-size:13px">카메라 켜기 버튼을 눌러 스캔 시작</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- USB 스캐너 & 결과 -->
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="card">
+              <div class="card-header"><div class="card-title">🔌 USB 스캐너 / 직접 입력</div></div>
+              <div class="card-body">
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">USB 스캐너로 스캔하거나 직접 입력 후 Enter</p>
+                <input id="scanInput" type="text" placeholder="기기ID 스캔/입력 후 Enter..."
+                  style="width:100%;font-size:15px;font-weight:500"
+                  onkeydown="if(event.key==='Enter'){processScan(this.value);this.value='';}" autofocus />
+                <button class="btn btn-primary" style="width:100%;margin-top:8px;justify-content:center"
+                  onclick="processScan(document.getElementById('scanInput').value);document.getElementById('scanInput').value=''">조회</button>
+              </div>
+            </div>
+            <div class="card" id="scanResultCard" style="display:none">
+              <div class="card-header" id="scanResultHeader"><div class="card-title" id="scanResultTitle">조회 결과</div></div>
+              <div class="card-body" id="scanResultBody"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 빠른 대여 패널 -->
+        <div class="card" id="quickLoanPanel" style="display:none">
+          <div class="card-header" style="background:var(--green)">
+            <div class="card-title" style="color:white">⚡ 빠른 대여 등록</div>
+          </div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:end">
+              <div class="form-group">
+                <label>기기/공간</label>
+                <input id="quickDeviceId" readonly style="background:var(--lt-blue);font-weight:600;color:var(--blue)" />
+              </div>
+              <div class="form-group">
+                <label>대여자</label>
+                <select id="quickBorrowerId" onchange="onQuickBorrowerChange()">
+                  <option value="">선택...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>이름</label>
+                <input id="quickBorrowerName" readonly style="background:var(--lt-blue)" />
+              </div>
+              <div class="form-group">
+                <label>반납예정일</label>
+                <input type="date" id="quickDueDate" />
+              </div>
+              <div>
+                <button class="btn btn-success" style="height:38px" onclick="saveQuickLoan()">대여 등록</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 빠른 반납 패널 -->
+        <div class="card" id="quickReturnPanel" style="display:none;margin-top:16px">
+          <div class="card-header" style="background:var(--blue)">
+            <div class="card-title" style="color:white">📤 빠른 반납 처리</div>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+              <div id="quickReturnInfo" style="flex:1;font-size:13px;color:var(--dark)"></div>
+              <input type="date" id="quickReturnDate" style="width:160px" />
+              <button class="btn btn-success" onclick="saveQuickReturn()">반납 완료</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 대여 등록 모달 -->
+<div class="modal-overlay" id="loanModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📋 대여 등록</div>
+      <button class="modal-close" onclick="closeModal('loanModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>대여번호</label><input id="loanId" placeholder="LN-001" /></div>
+
+        <!-- 기기 검색 선택 -->
+        <div class="form-group">
+          <label>기기 검색</label>
+          <div style="position:relative">
+            <input id="loanDeviceSearch" placeholder="기기명 또는 ID 검색..." autocomplete="off"
+              oninput="searchLoanDevice(this.value)"
+              onfocus="showDeviceDropdown()"
+              style="width:100%" />
+            <input type="hidden" id="loanDeviceId" />
+            <div id="loanDeviceDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--mid-gray);border-radius:8px;max-height:200px;overflow-y:auto;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+          </div>
+          <div id="loanDeviceSelected" style="display:none;margin-top:6px;padding:6px 10px;background:var(--lt-blue);border-radius:6px;font-size:12px;font-weight:600;color:var(--blue)"></div>
+        </div>
+
+        <!-- 대여자 검색 선택 -->
+        <div class="form-group">
+          <label>대여자 검색</label>
+          <div style="position:relative">
+            <input id="loanBorrowerSearch" placeholder="이름 또는 학번 검색..." autocomplete="off"
+              oninput="searchLoanBorrower(this.value)"
+              onfocus="showBorrowerDropdown()"
+              style="width:100%" />
+            <input type="hidden" id="loanBorrowerId" />
+            <div id="loanBorrowerDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--mid-gray);border-radius:8px;max-height:200px;overflow-y:auto;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+          </div>
+          <div id="loanBorrowerSelected" style="display:none;margin-top:6px;padding:6px 10px;background:var(--lt-green);border-radius:6px;font-size:12px;font-weight:600;color:var(--green)"></div>
+        </div>
+
+        <div class="form-group"><label>이름</label><input id="loanBorrowerName" readonly placeholder="자동입력" /></div>
+        <div class="form-group"><label>대여일</label><input type="date" id="loanDate" /></div>
+        <div class="form-group"><label>반납예정일</label><input type="date" id="loanDueDate" /></div>
+        <div class="form-group full"><label>비고</label><textarea id="loanNote" placeholder="메모..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('loanModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveLoan()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- 기기 추가 모달 -->
+<div class="modal-overlay" id="deviceModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="deviceModalTitle">💻 기기 추가</div>
+      <button class="modal-close" onclick="closeModal('deviceModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>기기ID</label><input id="devId" placeholder="NB-007" /></div>
+        <div class="form-group"><label>기기명</label><input id="devName" placeholder="노트북 #7" /></div>
+        <div class="form-group"><label>종류</label><select id="devCategory"><option value="노트북">노트북</option><option value="태블릿">태블릿</option><option value="타블렛">타블렛</option><option value="웹캠">웹캠</option><option value="포터블모니터">포터블모니터</option><option value="기타기기">기타기기</option></select></div>
+        <div class="form-group"><label>제조사</label><input id="devMaker" placeholder="삼성" /></div>
+        <div class="form-group full"><label>모델명</label><input id="devModel" placeholder="Galaxy Book4 Pro" /></div>
+        <div class="form-group"><label>라벨번호</label><input id="devLabel" placeholder="SN-LB-007" /></div>
+        <div class="form-group"><label>상태</label><select id="devStatus"><option value="대여가능">대여가능</option><option value="수리중">수리중</option><option value="분실">분실</option></select></div>
+        <div class="form-group"><label>구매일</label><input type="date" id="devPurchase" /></div>
+        <div class="form-group"><label>보증만료일</label><input type="date" id="devWarranty" /></div>
+        <div class="form-group full"><label>비고</label><input id="devNote" placeholder="메모..." /></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('deviceModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveDevice()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 학생 추가 모달 -->
+<div class="modal-overlay" id="studentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">👤 학생 추가</div>
+      <button class="modal-close" onclick="closeModal('studentModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>학번</label><input id="stuId" placeholder="20240001" /></div>
+        <div class="form-group"><label>이름</label><input id="stuName" placeholder="홍길동" /></div>
+        <div class="form-group"><label>학년/반</label><input id="stuClass" placeholder="2학년 1반" /></div>
+        <div class="form-group"><label>상태</label><select id="stuStatus"><option value="재학">재학</option><option value="졸업">졸업</option><option value="전학">전학</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('studentModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveStudent()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 교직원 추가 모달 -->
+<div class="modal-overlay" id="staffModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">👩‍🏫 교사·교직원 추가</div>
+      <button class="modal-close" onclick="closeModal('staffModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>이름</label><input id="stfName" placeholder="김선생" /></div>
+        <div class="form-group"><label>구분</label><select id="stfRole"><option value="교사">교사</option><option value="교감">교감</option><option value="교장">교장</option><option value="행정실">행정실</option><option value="실습실무사">실습실무사</option><option value="기타">기타</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('staffModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveStaff()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 공간 추가 모달 -->
+<div class="modal-overlay" id="roomModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🏫 공간 추가</div>
+      <button class="modal-close" onclick="closeModal('roomModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>공간명</label><input id="roomName" placeholder="제1실습실" /></div>
+        <div class="form-group"><label>종류</label><select id="roomCategory">
+          <option value="실습실">실습실</option>
+          <option value="도서관">도서관</option>
+          <option value="기타특별실">기타특별실</option>
+        </select></div>
+        <div class="form-group"><label>수용인원</label><input id="roomCapacity" type="number" placeholder="30" /></div>
+        <div class="form-group full"><label>비고</label><input id="roomNote" placeholder="메모..." /></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('roomModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveRoom()">저장</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- 학생 수정 모달 -->
+<div class="modal-overlay" id="editStudentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ 학생 정보 수정</div>
+      <button class="modal-close" onclick="closeModal('editStudentModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>학번 (변경 불가)</label><input id="editStuId" readonly style="background:var(--gray)" /></div>
+        <div class="form-group"><label>이름</label><input id="editStuName" /></div>
+        <div class="form-group"><label>학년/반</label><input id="editStuClass" /></div>
+        <div class="form-group"><label>상태</label><select id="editStuStatus"><option value="재학">재학</option><option value="졸업">졸업</option><option value="전학">전학</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editStudentModal')">취소</button>
+      <button class="btn btn-primary" onclick="updateStudent()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 교직원 수정 모달 -->
+<div class="modal-overlay" id="editStaffModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ 교직원 정보 수정</div>
+      <button class="modal-close" onclick="closeModal('editStaffModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>이름 (변경 불가)</label><input id="editStfId" readonly style="background:var(--gray)" /></div>
+        <div class="form-group"><label>구분</label><select id="editStfRole"><option value="교사">교사</option><option value="교감">교감</option><option value="교장">교장</option><option value="행정실">행정실</option><option value="실습실무사">실습실무사</option><option value="기타">기타</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editStaffModal')">취소</button>
+      <button class="btn btn-primary" onclick="updateStaff()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 기기 수정 모달 -->
+<div class="modal-overlay" id="editDeviceModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ 기기 정보 수정</div>
+      <button class="modal-close" onclick="closeModal('editDeviceModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>기기ID (변경 불가)</label><input id="editDevId" readonly style="background:var(--gray)" /></div>
+        <div class="form-group"><label>기기명</label><input id="editDevName" /></div>
+        <div class="form-group"><label>종류</label><select id="editDevCategory"><option value="노트북">노트북</option><option value="태블릿">태블릿</option><option value="타블렛">타블렛</option><option value="웹캠">웹캠</option><option value="포터블모니터">포터블모니터</option><option value="기타기기">기타기기</option></select></div>
+        <div class="form-group"><label>제조사</label><input id="editDevMaker" /></div>
+        <div class="form-group full"><label>모델명</label><input id="editDevModel" /></div>
+        <div class="form-group"><label>라벨번호</label><input id="editDevLabel" /></div>
+        <div class="form-group"><label>상태</label><select id="editDevStatus"><option value="대여가능">대여가능</option><option value="대여중">대여중</option><option value="수리중">수리중</option><option value="분실">분실</option></select></div>
+        <div class="form-group"><label>구매일</label><input type="date" id="editDevPurchase" /></div>
+        <div class="form-group"><label>보증만료일</label><input type="date" id="editDevWarranty" /></div>
+        <div class="form-group full"><label>비고</label><input id="editDevNote" /></div>
+      </div>
+
+      <!-- 대여중일 때 대여자 수정 -->
+      <div id="editDevLoanSection" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--mid-gray)">
+        <div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:12px">📋 대여 정보 추가/수정</div>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>대여자 검색/변경</label>
+            <div style="position:relative">
+              <input id="editDevBorrowerSearch" placeholder="이름 또는 학번 검색..." autocomplete="off"
+                oninput="searchEditDevBorrower(this.value)"
+                onfocus="searchEditDevBorrower(this.value)"
+                style="width:100%" />
+              <input type="hidden" id="editDevLoanId" />
+              <input type="hidden" id="editDevBorrowerId" />
+              <div id="editDevBorrowerDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--mid-gray);border-radius:8px;max-height:160px;overflow-y:auto;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+            </div>
+            <div id="editDevBorrowerSelected" style="margin-top:6px;padding:6px 10px;background:var(--lt-blue);border-radius:6px;font-size:12px;font-weight:600;color:var(--blue)"></div>
+          </div>
+          <div class="form-group"><label>대여일</label><input type="date" id="editDevLoanDate" /></div>
+          <div class="form-group"><label>반납예정일</label><input type="date" id="editDevDueDate" /></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editDeviceModal')">취소</button>
+      <button class="btn btn-primary" onclick="updateDevice()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 공간 수정 모달 -->
+<div class="modal-overlay" id="editRoomModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ 공간 정보 수정</div>
+      <button class="modal-close" onclick="closeModal('editRoomModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>공간ID (변경 불가)</label><input id="editRoomId" readonly style="background:var(--gray)" /></div>
+        <div class="form-group"><label>공간명</label><input id="editRoomName" /></div>
+        <div class="form-group"><label>종류</label><select id="editRoomCategory"><option value="실습실">실습실</option><option value="도서관">도서관</option><option value="기타특별실">기타특별실</option></select></div>
+        <div class="form-group"><label>수용인원</label><input type="number" id="editRoomCapacity" /></div>
+        <div class="form-group full"><label>비고</label><input id="editRoomNote" /></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editRoomModal')">취소</button>
+      <button class="btn btn-primary" onclick="updateRoom()">저장</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- 대여 수정 모달 -->
+<div class="modal-overlay" id="editLoanModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ 대여 내역 수정</div>
+      <button class="modal-close" onclick="closeModal('editLoanModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>대여번호 (변경 불가)</label><input id="editLoanId" readonly style="background:var(--gray)" /></div>
+        <div class="form-group"><label>기기ID (변경 불가)</label><input id="editLoanDeviceId" readonly style="background:var(--gray)" /></div>
+
+        <!-- 대여자 검색 -->
+        <div class="form-group full">
+          <label>대여자 검색/변경</label>
+          <div style="position:relative">
+            <input id="editLoanBorrowerSearch" placeholder="이름 또는 학번 검색..." autocomplete="off"
+              oninput="searchEditLoanBorrower(this.value)"
+              onfocus="searchEditLoanBorrower(this.value)"
+              style="width:100%" />
+            <input type="hidden" id="editLoanBorrowerId" />
+            <div id="editLoanBorrowerDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--mid-gray);border-radius:8px;max-height:180px;overflow-y:auto;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+          </div>
+          <div id="editLoanBorrowerSelected" style="margin-top:6px;padding:6px 10px;background:var(--lt-green);border-radius:6px;font-size:12px;font-weight:600;color:var(--green)"></div>
+        </div>
+
+        <div class="form-group"><label>대여일</label><input type="date" id="editLoanDate" /></div>
+        <div class="form-group"><label>반납예정일</label><input type="date" id="editLoanDueDate" /></div>
+        <div class="form-group"><label>상태</label>
+          <select id="editLoanStatus">
+            <option value="대여중">대여중</option>
+            <option value="반납완료">반납완료</option>
+            <option value="연체">연체</option>
+          </select>
+        </div>
+        <div class="form-group"><label>반납일</label><input type="date" id="editLoanReturnDate" /></div>
+        <div class="form-group full"><label>비고</label><input id="editLoanNote" /></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editLoanModal')">취소</button>
+      <button class="btn btn-primary" onclick="updateLoan()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 반납 모달 -->
+<div class="modal-overlay" id="returnModal">
+  <div class="modal" style="width:360px">
+    <div class="modal-header">
+      <div class="modal-title">📤 반납 처리</div>
+      <button class="modal-close" onclick="closeModal('returnModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;" id="returnInfo"></p>
+      <div class="form-group"><label>반납일</label><input type="date" id="returnDate" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('returnModal')">취소</button>
+      <button class="btn btn-success" onclick="confirmReturn()">반납 완료</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL_KEY = 'sb_url';
+const SUPABASE_KEY_KEY = 'sb_key';
+let sb = null;
+let allDevices = [], allLoans = [], allStudents = [], allStaff = [], allRooms = [];
+let currentPage = 'dashboard';
+let returningLoanId = null;
+
+// ── Init ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const url = localStorage.getItem(SUPABASE_URL_KEY);
+  const key = localStorage.getItem(SUPABASE_KEY_KEY);
+  if (url && key) {
+    initApp(url, key);
+  } else {
+    document.getElementById('configScreen').style.display = 'flex';
+    // Pre-fill known values
+    document.getElementById('cfgUrl').value = 'https://pmkiptssekzyardupqvl.supabase.co';
+    document.getElementById('cfgKey').value = 'sb_publishable_8zU3M6zHww5Ru_Vs0gyt3g_yBMa5m5l';
+  }
+});
+
+function connectSupabase() {
+  const url = document.getElementById('cfgUrl').value.trim();
+  const key = document.getElementById('cfgKey').value.trim();
+  if (!url || !key) { showToast('URL과 키를 모두 입력해주세요', 'error'); return; }
+  localStorage.setItem(SUPABASE_URL_KEY, url);
+  localStorage.setItem(SUPABASE_KEY_KEY, key);
+  initApp(url, key);
+}
+
+function initApp(url, key) {
+  try {
+    sb = supabase.createClient(url, key);
+    document.getElementById('configScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadAll().then(() => {
+      const lastPage = localStorage.getItem('lastPage');
+      if (lastPage && lastPage !== 'dashboard') showPage(lastPage);
+    });
+  } catch(e) {
+    showToast('연결 실패: ' + e.message, 'error');
+  }
+}
+
+// ── Data loading ──────────────────────────────────────────────
+async function loadAll() {
+  await Promise.all([loadDevices(), loadLoans(), loadStudents(), loadStaff(), loadRooms()]);
+  renderDashboard();
+}
+
+async function loadDevices() {
+  const { data, error } = await sb.from('devices').select('*').order('id');
+  if (!error) allDevices = data || [];
+}
+
+async function loadLoans() {
+  const { data, error } = await sb.from('loans').select('*').order('created_at', { ascending: false });
+  if (error) { console.error('loadLoans error:', JSON.stringify(error)); showToast('대여 내역 로드 실패: ' + (error.message||error.code||JSON.stringify(error)), 'error'); }
+  else allLoans = data || [];
+}
+
+async function loadStudents() {
+  const { data, error } = await sb.from('students').select('*').order('class_info').order('id');
+  if (!error) allStudents = (data || []).filter(s => s.status === '재학');
+}
+
+async function loadStaff() {
+  const { data, error } = await sb.from('staff').select('*').order('id');
+  if (!error) allStaff = data || [];
+}
+
+// ── Navigation ────────────────────────────────────────────────
+// ── Bulk Import ───────────────────────────────────────────────
+let bulkParsedData = { device: [], student: [], staff: [] };
+
+const pageTitles = {
+  dashboard:'대시보드', devices:'전체 기기', notebooks:'노트북',
+  tablets:'태블릿', tabletKo:'타블렛', webcams:'웹캠', monitors:'포터블모니터', others:'기타기기', loans:'대여현황',
+  overdue:'연체현황', students:'학생 관리', staff:'교사·교직원 관리',
+  rooms:'실습실·특별실 관리', scan:'📷 바코드 스캔 — 빠른 대여/반납', bulk:'일괄 입력 / 업로드'
+};
+
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick')?.includes(`'${page}'`)) n.classList.add('active');
+  });
+  localStorage.setItem('lastPage', page);
+  document.getElementById('pageTitle').textContent = pageTitles[page] || page;
+  currentPage = page;
+
+  const addBtn = document.getElementById('topAddBtn');
+  const lendBtn = document.getElementById('lendBtn');
+  addBtn.style.display = 'none';
+  lendBtn.style.display = 'none';
+
+  if (['devices','notebooks','tablets','tabletKo','webcams','monitors','others'].includes(page)) { addBtn.style.display = ''; addBtn.textContent = '+ 기기 추가'; }
+  if (page === 'students') { addBtn.style.display = ''; addBtn.textContent = '+ 학생 추가'; }
+  if (page === 'staff') { addBtn.style.display = ''; addBtn.textContent = '+ 교직원 추가'; }
+  if (page === 'rooms') { addBtn.style.display = ''; addBtn.textContent = '+ 공간 추가'; }
+  if (page === 'loans') { lendBtn.style.display = ''; setTimeout(() => { try { populateLoanCategoryFilter(); } catch(e){} }, 50); }
+
+  renderPage(page);
+}
+
+function openAddModal() {
+  if (['devices','notebooks','tablets','others'].includes(currentPage)) openDeviceModal();
+  else if (currentPage === 'students') openStudentModal();
+  else if (currentPage === 'staff') openStaffModal();
+  else if (currentPage === 'rooms') openRoomModal();
+}
+
+// ── Render ────────────────────────────────────────────────────
+function statusBadge(s) {
+  const map = { '대여가능':'available', '대여중':'lent', '연체':'overdue', '수리중':'repair', '분실':'overdue', '반납완료':'returned' };
+  const label = s || '-';
+  return `<span class="badge badge-${map[s]||'returned'}">${label}</span>`;
+}
+
+function calcOverdueDays(dueDate, returnDate) {
+  if (!dueDate) return 0;
+  const due = new Date(dueDate);
+  const end = returnDate ? new Date(returnDate) : new Date();
+  const diff = Math.floor((end - due) / 86400000);
+  return diff > 0 ? diff : 0;
+}
+
+function getActiveLoan(deviceId) {
+  return allLoans.find(l => l.device_id === deviceId && ['대여중','연체'].includes(l.status));
+}
+
+function getBorrowerName(id) {
+  const stu = allStudents.find(s => s.id === id);
+  if (stu) return stu.name;
+  const stf = allStaff.find(s => s.id === id);
+  return stf ? stf.name : id;
+}
+
+function renderPage(page) {
+  if (page === 'dashboard') renderDashboard();
+  else if (page === 'devices') renderDeviceTable(allDevices, 'deviceTableAll', true);
+  else if (page === 'notebooks') { renderPageWithFilter('notebooks', '노트북', 'notebookPrefixFilter', 'deviceTableNotebook'); }
+  else if (page === 'tablets') { renderPageWithFilter('tablets', '태블릿', 'tabletPrefixFilter', 'deviceTableTablet'); }
+  else if (page === 'others') { renderPageWithFilter('others', '기타기기', 'otherPrefixFilter', 'deviceTableOther'); }
+  else if (page === 'tabletKo') { renderPageWithFilter('tabletKo', '타블렛', 'tabletKoPrefixFilter', 'deviceTableTabletKo'); }
+  else if (page === 'webcams') { renderPageWithFilter('webcams', '웹캠', 'webcamPrefixFilter', 'deviceTableWebcam'); }
+  else if (page === 'monitors') { renderPageWithFilter('monitors', '포터블모니터', 'monitorPrefixFilter', 'deviceTableMonitor'); }
+  else if (page === 'loans') {
+    try { populateLoanCategoryFilter(); } catch(e) {}
+    renderLoanTable(allLoans, 'loanTable');
+  }
+  else if (page === 'overdue') renderOverdueTable(allLoans.filter(l=>l.status==='연체'), 'overdueTable');
+  else if (page === 'students') {
+    const statusSel = document.getElementById('studentStatusFilter');
+    const status = statusSel ? statusSel.value : '재학';
+    renderStudentTable(allStudents.filter(s => !status || s.status === status), 'studentTable');
+  }
+  else if (page === 'staff') renderStaffTable(allStaff, 'staffTable');
+  else if (page === 'rooms') renderRoomTable(allRooms, 'roomTable');
+  else if (page === 'scan') initScanPage();
+}
+
+function renderDashboard() {
+  const lent = allDevices.filter(d=>d.status==='대여중').length;
+  const avail = allDevices.filter(d=>d.status==='대여가능').length;
+  const over = allDevices.filter(d=>d.status==='연체').length;
+  document.getElementById('kpi-total').textContent = allDevices.length;
+  document.getElementById('kpi-available').textContent = avail;
+  document.getElementById('kpi-lent').textContent = lent;
+  document.getElementById('kpi-overdue').textContent = over;
+  const lost = allDevices.filter(d=>d.status==='분실').length;
+  document.getElementById('kpi-lost').textContent = lost;
+  document.getElementById('kpi-students').textContent = allStudents.length;
+  document.getElementById('kpi-staff').textContent = allStaff.length;
+
+  // 종류별 현황 테이블
+  const CATEGORIES = ['노트북','태블릿','타블렛','웹캠','포터블모니터','기타기기'];
+  const catTbody = document.getElementById('categoryStatTable');
+  if (catTbody) {
+    // 등록된 실제 카테고리 목록 (설정된 6개 + 기타)
+    const allCats = [...new Set(allDevices.map(d=>d.category).filter(Boolean))].sort();
+    const orderedCats = [...CATEGORIES.filter(c=>allCats.includes(c)), ...allCats.filter(c=>!CATEGORIES.includes(c))];
+    let rows = orderedCats.map(cat => {
+      const devs = allDevices.filter(d=>d.category===cat);
+      const av = devs.filter(d=>d.status==='대여가능').length;
+      const lt = devs.filter(d=>d.status==='대여중').length;
+      const ov = devs.filter(d=>d.status==='연체').length;
+      const rp = devs.filter(d=>d.status==='수리중').length;
+      const ls = devs.filter(d=>d.status==='분실').length;
+      const tot = devs.length;
+      return `<tr>
+        <td style="font-weight:600">${cat}</td>
+        <td style="text-align:center;color:var(--green);font-weight:500">${av||'-'}</td>
+        <td style="text-align:center;color:var(--blue);font-weight:500">${lt||'-'}</td>
+        <td style="text-align:center;color:var(--red);font-weight:500">${ov||'-'}</td>
+        <td style="text-align:center;color:var(--amber);font-weight:500">${rp||'-'}</td>
+        <td style="text-align:center;color:var(--red);font-weight:500">${ls||'-'}</td>
+        <td style="text-align:center;font-weight:700">${tot}</td>
+      </tr>`;
+    });
+    // 합계 행
+    const totAv = allDevices.filter(d=>d.status==='대여가능').length;
+    const totLt = allDevices.filter(d=>d.status==='대여중').length;
+    const totOv = allDevices.filter(d=>d.status==='연체').length;
+    const totRp = allDevices.filter(d=>d.status==='수리중').length;
+    const totLs = allDevices.filter(d=>d.status==='분실').length;
+    rows.push(`<tr style="background:var(--gray);font-weight:700;border-top:2px solid var(--mid-gray)">
+      <td>합 계</td>
+      <td style="text-align:center;color:var(--green)">${totAv}</td>
+      <td style="text-align:center;color:var(--blue)">${totLt}</td>
+      <td style="text-align:center;color:var(--red)">${totOv}</td>
+      <td style="text-align:center;color:var(--amber)">${totRp}</td>
+      <td style="text-align:center;color:var(--red)">${totLs}</td>
+      <td style="text-align:center">${allDevices.length}</td>
+    </tr>`);
+    catTbody.innerHTML = rows.join('');
+  }
+
+  const overdueLoans = allLoans.filter(l=>l.status==='연체');
+  const oTbody = document.getElementById('overdueTableDash');
+  oTbody.innerHTML = overdueLoans.length ? overdueLoans.slice(0,5).map(l => {
+    const dev = allDevices.find(d=>d.id===l.device_id);
+    const days = calcOverdueDays(l.due_date, l.return_date);
+    return `<tr><td>${dev?.name||l.device_id}</td><td>${l.borrower_name}</td><td>${l.due_date||'-'}</td><td style="color:var(--red);font-weight:700">${days}일</td><td><button class="btn btn-success btn-sm" onclick="openReturnModal('${l.id}','${l.borrower_name}','${dev?.name||l.device_id}')">반납</button></td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty"><div class="empty-icon">✅</div><p>연체 없음</p></td></tr>';
+
+  const rTbody = document.getElementById('recentLoansTable');
+  rTbody.innerHTML = allLoans.slice(0,6).map(l => {
+    const dev = allDevices.find(d=>d.id===l.device_id);
+    return `<tr><td>${dev?.name||l.device_id}</td><td>${l.borrower_name}</td><td>${l.loan_date||'-'}</td><td>${statusBadge(l.status)}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="empty"><p>대여 내역 없음</p></td></tr>';
+}
+
+function renderDeviceTable(devices, tbodyId, showCategory) {
+  const tbody = document.getElementById(tbodyId);
+  if (!devices.length) { tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-icon">💻</div><p>등록된 기기가 없어요</p></div></td></tr>`; return; }
+  tbody.innerHTML = devices.map(d => {
+    const loan = getActiveLoan(d.id);
+    const borrower = loan ? loan.borrower_name : '-';
+    const dueDate = loan ? loan.due_date : '-';
+    const categoryCol = showCategory ? `<td>${d.category||'-'}</td>` : '';
+    const canDelete = !['대여중','연체'].includes(d.status);
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px">${d.id}</td>
+      <td style="font-weight:600">${d.name}</td>
+      ${categoryCol}
+      <td>${d.maker||'-'}</td>
+      <td>${d.model||'-'}</td>
+      ${!showCategory ? `<td style="font-size:12px">${d.label||'-'}</td>` : ''}
+      <td>${statusBadge(d.status)}</td>
+      <td>${borrower}</td>
+      <td>${dueDate}</td>
+      <td style="white-space:nowrap;display:flex;gap:4px;">
+        ${d.status==='대여가능' ? `<button class="btn btn-primary btn-sm" onclick="quickLend('${d.id}')">대여</button>` : ''}
+        ${['대여중','연체'].includes(d.status) ? `<button class="btn btn-success btn-sm" data-lid="${loan?.id||''}" data-did="${d.id}" data-name="${d.name}" data-borrower="${borrower}" onclick="openReturnByDevice(this)">반납</button>` : ''}
+        ${['대여중','연체'].includes(d.status) && loan ? `<button class="btn btn-outline btn-sm" data-id="${loan.id}" onclick="openEditLoan(this.dataset.id)">대여수정</button>` : ''}
+        <button class="btn btn-outline btn-sm" data-id="${d.id}" onclick="openEditDevice(this.dataset.id)">수정</button>
+        ${canDelete ? `<button class="btn btn-danger btn-sm" data-id="${d.id}" onclick="deleteDevice(this.dataset.id)">삭제</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderLoanTable(loans, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!loans.length) { tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><p>대여 내역 없음</p></div></td></tr>`; return; }
+  tbody.innerHTML = loans.map(l => {
+    const days = l.status==='연체' ? calcOverdueDays(l.due_date, l.return_date) : 0;
+    return `<tr>
+      <td style="font-size:12px">${l.id}</td>
+      <td style="font-family:monospace;font-size:12px">${l.device_id}</td>
+      <td style="font-weight:600">${l.borrower_name}</td>
+      <td>${l.loan_date||'-'}</td>
+      <td>${l.due_date||'-'}</td>
+      <td>${statusBadge(l.status)}</td>
+      <td>${l.return_date||'-'}</td>
+      <td style="color:${days>0?'var(--red)':'inherit'};font-weight:${days>0?700:400}">${days>0?days+'일':'-'}</td>
+      <td style="white-space:nowrap;display:flex;gap:4px;">
+        ${l.status!=='반납완료'?`<button class="btn btn-success btn-sm" onclick="openReturnModal('${l.id}','${l.borrower_name}','${l.device_id}')">반납</button>`:''}
+        <button class="btn btn-outline btn-sm" data-id="${l.id}" onclick="openEditLoan(this.dataset.id)">수정</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLoan('${l.id}','${l.device_id}','${l.status}')">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderOverdueTable(loans, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!loans.length) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">✅</div><p>연체 없음</p></div></td></tr>`; return; }
+  tbody.innerHTML = loans.map(l => {
+    const dev = allDevices.find(d=>d.id===l.device_id);
+    const stu = allStudents.find(s=>s.id===l.borrower_id);
+    const stf = allStaff.find(s=>s.id===l.borrower_id);
+    const phone = stu?.phone || stf?.phone || '-';
+    const days = calcOverdueDays(l.due_date);
+    return `<tr>
+      <td style="font-size:12px">${l.id}</td>
+      <td style="font-weight:600">${dev?.name||l.device_id}</td>
+      <td>${l.borrower_name}</td>
+      <td>${l.due_date||'-'}</td>
+      <td style="color:var(--red);font-weight:700">${days}일</td>
+      <td>${phone}</td>
+      <td><button class="btn btn-success btn-sm" onclick="openReturnModal('${l.id}','${l.borrower_name}','${dev?.name||l.device_id}')">반납</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderStudentTable(students, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!students.length) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><p>등록된 학생 없음</p></div></td></tr>`; return; }
+  tbody.innerHTML = students.map(s => {
+    const activeLoanCount = allLoans.filter(l=>l.borrower_id===s.id && ['대여중','연체'].includes(l.status)).length;
+    const statusBadgeClass = s.status==='재학' ? 'available' : s.status==='졸업' ? 'returned' : 'repair';
+    return `<tr>
+      <td><input type="checkbox" class="row-check" data-type="student" data-id="${s.id}" onchange="onCheckChange('student')" /></td>
+      <td style="font-family:monospace;font-size:12px;font-weight:600">${s.id}</td>
+      <td style="font-weight:600">${s.name||'-'}</td>
+      <td>${s.class_info||'-'}</td>
+      <td><span class="badge badge-${statusBadgeClass}">${s.status||'재학'}</span></td>
+      <td>${activeLoanCount>0?`<span class="badge badge-lent">${activeLoanCount}건</span>`:'-'}</td>
+      <td style="white-space:nowrap;display:flex;gap:4px"><button class="btn btn-outline btn-sm" data-id="${s.id}" onclick="openEditStudent(this.dataset.id)">수정</button><button class="btn btn-danger btn-sm" data-id="${s.id}" onclick="deleteStudent(this.dataset.id)">삭제</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderStaffTable(staff, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!staff.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><p>등록된 교직원 없음</p></div></td></tr>`; return; }
+  tbody.innerHTML = staff.map(s => {
+    const activeLoanCount = allLoans.filter(l=>l.borrower_id===s.id && ['대여중','연체'].includes(l.status)).length;
+    return `<tr>
+      <td><input type="checkbox" class="row-check" data-type="staff" data-id="${s.id}" onchange="onCheckChange('staff')" /></td>
+      <td style="font-weight:600">${s.name||s.id}</td>
+      <td><span class="badge" style="background:var(--lt-blue);color:var(--blue)">${s.role||'교직원'}</span></td>
+      <td>${activeLoanCount>0?`<span class="badge badge-lent">${activeLoanCount}건</span>`:'-'}</td>
+      <td style="white-space:nowrap;display:flex;gap:4px"><button class="btn btn-outline btn-sm" data-id="${s.id}" onclick="openEditStaff(this.dataset.id)">수정</button><button class="btn btn-danger btn-sm" data-id="${s.id}" onclick="deleteStaff(this.dataset.id)">삭제</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Filters ───────────────────────────────────────────────────
+function getDevicePrefix(id) {
+  // Extract letter prefix from ID (e.g. NSS001 → NSS, LGN012 → LGN)
+  const match = (id||'').match(/^([A-Za-z가-힣]+)/);
+  return match ? match[1].toUpperCase() : '';
+}
+
+function populatePrefixFilter(category) {
+  const filterMap = { '노트북':'notebookPrefixFilter', '태블릿':'tabletPrefixFilter', '기타전자기기':'otherPrefixFilter' };
+  const selId = filterMap[category];
+  if (!selId) return;
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  const current = sel.value;
+  const devices = allDevices.filter(d =>
+    category==='노트북' ? isNotebook(d.category) :
+    category==='태블릿' ? isTablet(d.category) :
+    category==='기타' ? (!isNotebook(d.category)&&!isTablet(d.category)) :
+    d.category===category
+  );
+  const prefixes = [...new Set(devices.map(d => getDevicePrefix(d.id)).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">전체 ID</option>' + prefixes.map(p => {
+    const count = devices.filter(d => getDevicePrefix(d.id) === p).length;
+    return `<option value="${p}" ${current===p?'selected':''}>${p} (${count}대)</option>`;
+  }).join('');
+}
+
+function filterDevices(q, category) {
+  const filterMap = { '노트북':'notebookPrefixFilter', '태블릿':'tabletPrefixFilter', '기타전자기기':'otherPrefixFilter' };
+  const selId = filterMap[category];
+  const prefix = selId ? (document.getElementById(selId)?.value || '') : '';
+
+  const filtered = allDevices.filter(d => {
+    const matchCat = !category || category==='all' || d.category===category;
+    const matchQ = !q || [d.id,d.name,d.maker,d.model,d.label].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()));
+    const matchPrefix = !prefix || getDevicePrefix(d.id) === prefix;
+    return matchCat && matchQ && matchPrefix;
+  });
+  const tableMap = { all:'deviceTableAll', '노트북':'deviceTableNotebook', '태블릿':'deviceTableTablet', '기타전자기기':'deviceTableOther' };
+  renderDeviceTable(filtered, tableMap[category]||'deviceTableAll', category==='all');
+}
+
+function filterDeviceStatus(status, category) {
+  const filtered = allDevices.filter(d => (!status || d.status===status));
+  renderDeviceTable(filtered, 'deviceTableAll', true);
+}
+
+function populateLoanCategoryFilter() {
+  const sel = document.getElementById('loanCategoryFilter');
+  if (!sel || !allDevices.length) return;
+  const saved = localStorage.getItem('lf_cat') || '';
+  const cats = [...new Set(allDevices.map(d=>d.category).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">전체 종류</option>' + cats.map(c =>
+    `<option value="${c}" ${saved===c?'selected':''}>${c}</option>`
+  ).join('');
+  // 다른 필터도 복원
+  const typeEl = document.getElementById('loanBorrowerTypeFilter');
+  const statusEl = document.getElementById('loanStatusFilter');
+  if (typeEl) typeEl.value = localStorage.getItem('lf_type') || '';
+  if (statusEl) statusEl.value = localStorage.getItem('lf_status') || '';
+  // 복원된 필터로 바로 렌더
+  filterLoans(document.querySelector('#page-loans .search-input')?.value || '');
+}
+
+function filterLoans(q) {
+  const borrowerType = document.getElementById('loanBorrowerTypeFilter')?.value || '';
+  const status = document.getElementById('loanStatusFilter')?.value || '';
+  const category = document.getElementById('loanCategoryFilter')?.value || '';
+  const filtered = allLoans.filter(l => {
+    const matchQ = !q || [l.id, l.device_id, l.borrower_name].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()));
+    const matchStatus = !status || l.status === status;
+    const isStaff = allStaff.some(s => s.id === l.borrower_id);
+    const isStudent = allStudents.some(s => s.id === l.borrower_id);
+    const matchType = !borrowerType ||
+      (borrowerType === 'student' && isStudent) ||
+      (borrowerType === 'staff' && isStaff);
+    const dev = allDevices.find(d => d.id === l.device_id);
+    const matchCategory = !category || dev?.category === category;
+    return matchQ && matchStatus && matchType && matchCategory;
+  });
+  renderLoanTable(filtered, 'loanTable');
+}
+
+function filterLoanStatus(status) {
+  filterLoans(document.querySelector('#page-loans input')?.value || '');
+}
+
+function filterStudents(q) {
+  const status = document.getElementById('studentStatusFilter')?.value || '재학';
+  const filtered = allStudents.filter(s => {
+    const matchQ = !q || [s.name, s.display_name, s.student_no1, s.student_no2, s.student_no3].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()));
+    return matchQ && (!status || s.status === status);
+  });
+  renderStudentTable(filtered, 'studentTable');
+}
+
+function filterStudentStatus(status) {
+  const q = document.querySelector('#page-students input')?.value || '';
+  const filtered = allStudents.filter(s => {
+    const matchQ = !q || [s.name, s.display_name, s.student_no1, s.student_no2, s.student_no3].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()));
+    return matchQ && (!status || s.status === status);
+  });
+  renderStudentTable(filtered, 'studentTable');
+}
+
+function filterStaff(q) {
+  const filtered = allStaff.filter(s => !q || [s.id,s.name].some(v=>(v||'').toLowerCase().includes(q.toLowerCase())));
+  renderStaffTable(filtered, 'staffTable');
+}
+
+// ── Modals ────────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
+
+function openLoanModal() {
+  ['loanDeviceSearch','loanBorrowerSearch','loanBorrowerName','loanNote'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['loanDeviceId','loanBorrowerId'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['loanDeviceSelected','loanBorrowerSelected','loanDeviceDropdown','loanBorrowerDropdown'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+  const lastNum = allLoans.length ? Math.max(...allLoans.map(l=>parseInt(l.id.replace(/\D/g,'')||'0'))) : 0;
+  document.getElementById('loanId').value = 'LN-' + String(lastNum+1).padStart(3,'0');
+  const today = new Date().toISOString().split('T')[0];
+  const due = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
+  document.getElementById('loanDate').value = today;
+  document.getElementById('loanDueDate').value = due;
+  document.getElementById('loanNote').value = '';
+  document.getElementById('loanModal').classList.add('open');
+}
+
+function searchLoanDevice(q) {
+  const dd = document.getElementById('loanDeviceDropdown');
+  const available = [
+    ...allDevices.filter(d=>d.status==='대여가능'),
+    ...allRooms.filter(r=>r.status==='사용가능').map(r=>({...r, isRoom:true}))
+  ];
+  const filtered = q
+    ? available.filter(d=>[d.id,d.name,d.maker,d.model,d.label].some(v=>(v||'').toLowerCase().includes(q.toLowerCase())))
+    : available;
+  renderDeviceDropdown(filtered, dd);
+}
+
+function showDeviceDropdown() {
+  searchLoanDevice(document.getElementById('loanDeviceSearch').value);
+}
+
+function renderDeviceDropdown(items, dd) {
+  if (!items.length) {
+    dd.innerHTML = '<div class="search-dropdown-item" style="color:var(--text-muted)">검색 결과 없음</div>';
+  } else {
+    dd.innerHTML = items.slice(0,50).map(d => {
+      const badge = d.isRoom ? '공간' : d.category||'';
+      const bgC = d.isRoom ? 'var(--lt-green)' : 'var(--lt-blue)';
+      const txC = d.isRoom ? 'var(--green)' : 'var(--blue)';
+      return `<div class="search-dropdown-item" onclick="selectLoanDevice('${d.id}','${(d.name||'').replace(/'/g,"\\'")}','${badge}')">
+        <span style="font-family:monospace;font-size:12px;color:var(--text-muted);margin-right:8px">${d.id}</span>
+        <span style="font-weight:600">${d.name}</span>
+        <span class="item-badge" style="background:${bgC};color:${txC};margin-left:6px">${badge}</span>
+      </div>`;
+    }).join('');
+  }
+  dd.style.display = 'block';
+}
+
+function selectLoanDevice(id, name, category) {
+  document.getElementById('loanDeviceId').value = id;
+  document.getElementById('loanDeviceSearch').value = '';
+  document.getElementById('loanDeviceDropdown').style.display = 'none';
+  const sel = document.getElementById('loanDeviceSelected');
+  sel.textContent = `✓ ${name} (${id})`;
+  sel.style.display = 'block';
+}
+
+function searchLoanBorrower(q) {
+  const dd = document.getElementById('loanBorrowerDropdown');
+  const all = [
+    ...allStudents.filter(s=>s.status==='재학').map(s=>({...s,type:'학생'})),
+    ...allStaff.map(s=>({...s,type:s.role||'교직원'})),
+    ...allRooms.map(r=>({id:r.id, name:r.name, class_info:r.category, type:'공간'}))
+  ];
+  const filtered = q
+    ? all.filter(p=>[p.id,p.name,p.class_info].some(v=>(v||'').toLowerCase().includes(q.toLowerCase())))
+    : all.slice(0,20);
+  renderBorrowerDropdown(filtered, dd);
+}
+
+function showBorrowerDropdown() {
+  searchLoanBorrower(document.getElementById('loanBorrowerSearch').value);
+}
+
+function renderBorrowerDropdown(items, dd) {
+  dd.innerHTML = items.slice(0,50).map(p =>
+    `<div class="search-dropdown-item" onclick="selectLoanBorrower('${p.id}','${(p.name||'').replace(/'/g,"\\'")}','${p.type}')">
+      <span style="font-family:monospace;font-size:12px;color:var(--text-muted);margin-right:8px">${p.id}</span>
+      <span style="font-weight:600">${p.name}</span>
+    </div>`
+  ).join('') || '<div class="search-dropdown-item" style="color:var(--text-muted)">검색 결과 없음</div>';
+  dd.style.display = 'block';
+}
+
+function selectLoanBorrower(id, name, type) {
+  document.getElementById('loanBorrowerId').value = id;
+  document.getElementById('loanBorrowerName').value = name;
+  document.getElementById('loanBorrowerId').dataset.name = name;
+  document.getElementById('loanBorrowerSearch').value = '';
+  document.getElementById('loanBorrowerDropdown').style.display = 'none';
+  const sel = document.getElementById('loanBorrowerSelected');
+  const showId = id !== name ? ` (${id})` : '';
+  sel.textContent = `✓ ${name}${showId}`;
+  sel.style.display = 'block';
+}
+
+function quickLend(deviceId) {
+  openLoanModal();
+  setTimeout(() => {
+    const dev = allDevices.find(d=>d.id===deviceId);
+    if (dev) selectLoanDevice(deviceId, dev.name, dev.category||'');
+  }, 50);
+}
+
+async function saveLoan() {
+  const id = document.getElementById('loanId').value.trim();
+  const deviceId = document.getElementById('loanDeviceId').value;
+  const borrowerId = document.getElementById('loanBorrowerId').value;
+  const borrowerName = document.getElementById('loanBorrowerName').value;
+  const loanDate = document.getElementById('loanDate').value;
+  const dueDate = document.getElementById('loanDueDate').value;
+  const note = document.getElementById('loanNote').value;
+  if (!id||!deviceId||!borrowerId||!loanDate||!dueDate) { showToast('필수 항목을 모두 입력해주세요', 'error'); return; }
+  const { error: loanErr } = await sb.from('loans').insert([{ id, device_id:deviceId, borrower_id:borrowerId, borrower_name:borrowerName, loan_date:loanDate, due_date:dueDate, status:'대여중', note }]);
+  if (loanErr) { showToast('오류: '+loanErr.message, 'error'); return; }
+  const loanIsRoom = allRooms.some(r=>r.id===deviceId);
+  if (loanIsRoom) { await sb.from('rooms').update({ status:'사용중' }).eq('id', deviceId); }
+  else { await sb.from('devices').update({ status:'대여중' }).eq('id', deviceId); }
+  closeModal('loanModal');
+  showToast('대여 등록 완료! ✅', 'success');
+  await loadAll();
+  renderPage(currentPage);
+}
+
+
+function openReturnByDevice(btn) {
+  let loanId = btn.dataset.lid;
+  const deviceId = btn.dataset.did;
+  const deviceName = btn.dataset.name;
+  const borrower = btn.dataset.borrower;
+  // loanId가 없으면 loans에서 device_id로 찾기
+  if (!loanId || loanId === 'undefined') {
+    const loan = allLoans.find(l => l.device_id === deviceId && ['대여중','연체'].includes(l.status));
+    loanId = loan?.id || '';
+  }
+  if (!loanId) {
+    // loan 내역이 아예 없는 경우 - 기기 상태만 대여가능으로 변경
+    if (confirm(`"${deviceName}"을 반납 처리하시겠어요?
+(대여 내역 없이 상태만 변경됩니다)`)) {
+      const isRoom = allRooms.some(r=>r.id===deviceId);
+      if (isRoom) sb.from('rooms').update({status:'사용가능'}).eq('id',deviceId);
+      else sb.from('devices').update({status:'대여가능'}).eq('id',deviceId);
+      showToast('반납 처리 완료! ✅', 'success');
+      loadAll().then(()=>renderPage(currentPage));
+    }
+    return;
+  }
+  openReturnModal(loanId, borrower, deviceName);
+}
+
+function openReturnModal(loanId, borrowerName, deviceName) {
+  returningLoanId = loanId;
+  document.getElementById('returnInfo').textContent = `${borrowerName}님이 대여한 "${deviceName}"을 반납 처리합니다.`;
+  document.getElementById('returnDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('returnModal').classList.add('open');
+}
+
+async function confirmReturn() {
+  const returnDate = document.getElementById('returnDate').value;
+  if (!returnDate) { showToast('반납일을 선택해주세요', 'error'); return; }
+  const loan = allLoans.find(l=>l.id===returningLoanId);
+  if (!loan) return;
+  await sb.from('loans').update({ status:'반납완료', return_date:returnDate }).eq('id', returningLoanId);
+  const isRoom = allRooms.some(r=>r.id===loan.device_id);
+  if (isRoom) { await sb.from('rooms').update({ status:'사용가능' }).eq('id', loan.device_id); }
+  else { await sb.from('devices').update({ status:'대여가능' }).eq('id', loan.device_id); }
+  closeModal('returnModal');
+  showToast('반납 처리 완료! ✅', 'success');
+  await loadAll();
+  renderPage(currentPage);
+  renderDashboard();
+}
+
+function openDeviceModal() {
+  ['devId','devName','devMaker','devModel','devLabel','devPurchase','devWarranty','devNote','devCategory'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('devStatus').value = '대여가능';
+
+  document.getElementById('deviceModal').classList.add('open');
+}
+
+async function saveDevice() {
+  const id = document.getElementById('devId').value.trim();
+  const name = document.getElementById('devName').value.trim();
+  if (!id||!name) { showToast('기기ID와 기기명은 필수예요', 'error'); return; }
+  const { error } = await sb.from('devices').insert([{
+    id, name, category: document.getElementById('devCategory').value,
+    maker: document.getElementById('devMaker').value,
+    model: document.getElementById('devModel').value,
+    label: document.getElementById('devLabel').value,
+    status: document.getElementById('devStatus').value,
+    purchase_date: document.getElementById('devPurchase').value||null,
+    warranty_date: document.getElementById('devWarranty').value||null,
+    note: document.getElementById('devNote').value,
+  }]);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+  closeModal('deviceModal');
+  showToast('기기 추가 완료! ✅', 'success');
+  await loadDevices();
+  renderPage(currentPage);
+}
+
+function openStudentModal() {
+  ['stuId','stuName','stuClass'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('stuStatus').value = '재학';
+  document.getElementById('studentModal').classList.add('open');
+}
+
+async function saveStudent() {
+  const admission_year = document.getElementById('stuAdmission').value.trim();
+  const name = document.getElementById('stuName').value.trim();
+  const student_no1 = document.getElementById('stuNo1').value.trim();
+  if (!name || !student_no1) { showToast('이름과 학번1은 필수예요', 'error'); return; }
+  // Use first available student number as primary id
+  const id = student_no1 || document.getElementById('stuNo2').value.trim() || document.getElementById('stuNo3').value.trim();
+  const display_name = document.getElementById('stuDisplay').value.trim() || name + ' ' + student_no1;
+  const { error } = await sb.from('students').insert([{
+    id, admission_year: admission_year ? parseInt(admission_year) : null,
+    student_no1, student_no2: document.getElementById('stuNo2').value.trim(),
+    student_no3: document.getElementById('stuNo3').value.trim(),
+    name, display_name,
+    status: document.getElementById('stuStatus').value,
+    gender: document.getElementById('stuGender').value,
+  }]);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+  closeModal('studentModal');
+  showToast('학생 추가 완료! ✅', 'success');
+  await loadStudents();
+  renderPage(currentPage);
+}
+
+function openStaffModal() {
+  document.getElementById('stfName').value = '';
+  document.getElementById('stfRole').value = '교사';
+  document.getElementById('staffModal').classList.add('open');
+}
+
+async function saveStaff() {
+  const name = document.getElementById('stfName').value.trim();
+  if (!name) { showToast('이름은 필수예요', 'error'); return; }
+  const { error } = await sb.from('staff').insert([{ id: name, name, role: document.getElementById('stfRole').value }]);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+  closeModal('staffModal');
+  showToast('교직원 추가 완료! ✅', 'success');
+  await loadStaff();
+  renderPage(currentPage);
+}
+
+
+
+// ── 대여 내역 수정 ─────────────────────────────────────────────
+function openEditLoan(id) {
+  const l = allLoans.find(x=>x.id===id);
+  if (!l) return;
+  document.getElementById('editLoanId').value = l.id;
+  document.getElementById('editLoanDeviceId').value = l.device_id;
+  document.getElementById('editLoanBorrowerId').value = l.borrower_id||l.borrower_name||'';
+  document.getElementById('editLoanBorrowerSelected').textContent = l.borrower_name ? `✓ ${l.borrower_name} (${l.borrower_id||''})` : '대여자 미지정 — 아래에서 검색하세요';
+  document.getElementById('editLoanBorrowerSelected').style.background = l.borrower_name ? 'var(--lt-green)' : 'var(--lt-red)';
+  document.getElementById('editLoanBorrowerSelected').style.color = l.borrower_name ? 'var(--green)' : 'var(--red)';
+  document.getElementById('editLoanBorrowerSearch').value = '';
+  document.getElementById('editLoanBorrowerDropdown').style.display = 'none';
+  document.getElementById('editLoanDate').value = l.loan_date||'';
+  document.getElementById('editLoanDueDate').value = l.due_date||'';
+  document.getElementById('editLoanStatus').value = l.status||'대여중';
+  document.getElementById('editLoanReturnDate').value = l.return_date||'';
+  document.getElementById('editLoanNote').value = l.note||'';
+  document.getElementById('editLoanModal').classList.add('open');
+}
+
+function searchEditLoanBorrower(q) {
+  const dd = document.getElementById('editLoanBorrowerDropdown');
+  const all = [
+    ...allStudents.filter(s=>s.status==='재학').map(s=>({...s,type:'학생'})),
+    ...allStaff.map(s=>({...s,type:s.role||'교직원'})),
+    ...allRooms.map(r=>({id:r.id, name:r.name, class_info:r.category, type:'공간'}))
+  ];
+  const filtered = q
+    ? all.filter(p=>[p.id,p.name,p.class_info].some(v=>(v||'').toLowerCase().includes(q.toLowerCase())))
+    : all.slice(0,20);
+  dd.innerHTML = filtered.slice(0,50).map(p => {
+    return `<div class="search-dropdown-item" onclick="selectEditLoanBorrower('${p.id}','${(p.name||'').replace(/'/g,"\'")}','${p.type}')" style="padding:7px 14px">
+      <span style="font-family:monospace;font-size:12px;color:var(--text-muted);margin-right:8px">${p.id}</span><span style="font-weight:600">${p.name}</span>
+    </div>`;
+  }).join('') || '<div class="search-dropdown-item" style="color:var(--text-muted)">검색 결과 없음</div>';
+  dd.style.display = 'block';
+}
+
+function selectEditLoanBorrower(id, name, type) {
+  document.getElementById('editLoanBorrowerId').value = id;
+  document.getElementById('editLoanBorrowerId').dataset.name = name;
+  document.getElementById('editLoanBorrowerSearch').value = '';
+  document.getElementById('editLoanBorrowerDropdown').style.display = 'none';
+  const sel = document.getElementById('editLoanBorrowerSelected');
+  const showId = id !== name ? ` (${id})` : '';
+  sel.textContent = `✓ ${name}${showId}`;
+  sel.style.background = 'var(--lt-green)';
+  sel.style.color = 'var(--green)';
+}
+
+function searchEditDevBorrower(q) {
+  const dd = document.getElementById('editDevBorrowerDropdown');
+  if (!dd) return;
+  const all = [
+    ...allStudents.filter(s=>s.status==='재학').map(s=>({...s,type:'학생'})),
+    ...allStaff.map(s=>({...s,type:s.role||'교직원'})),
+    ...allRooms.map(r=>({id:r.id, name:r.name, class_info:r.category, type:'공간'}))
+  ];
+  const filtered = q
+    ? all.filter(p=>[p.id,p.name,p.class_info].some(v=>(v||'').toLowerCase().includes(q.toLowerCase())))
+    : all.slice(0,20);
+  dd.innerHTML = filtered.slice(0,50).map(p =>
+    `<div class="search-dropdown-item" onclick="selectEditDevBorrower('${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">
+      <span style="font-family:monospace;font-size:12px;color:var(--text-muted);margin-right:8px">${p.id}</span><span style="font-weight:600">${p.name}</span>
+    </div>`
+  ).join('') || '<div class="search-dropdown-item" style="color:var(--text-muted)">검색 결과 없음</div>';
+  dd.style.display = 'block';
+}
+
+function selectEditDevBorrower(id, name) {
+  document.getElementById('editDevBorrowerId').value = id;
+  document.getElementById('editDevBorrowerId').dataset.name = name;
+  document.getElementById('editDevBorrowerSearch').value = '';
+  document.getElementById('editDevBorrowerDropdown').style.display = 'none';
+  const sel = document.getElementById('editDevBorrowerSelected');
+  const showId = id !== name ? ` (${id})` : '';
+  sel.textContent = `✓ ${name}${showId}`;
+  sel.style.background = 'var(--lt-green)';
+  sel.style.color = 'var(--green)';
+}
+
+async function updateLoan() {
+  const id = document.getElementById('editLoanId').value;
+  const borrowerId = document.getElementById('editLoanBorrowerId').value;
+  const borrowerName = document.getElementById('editLoanBorrowerId').dataset.name ||
+    allStudents.find(s=>s.id===borrowerId)?.name ||
+    allStaff.find(s=>s.id===borrowerId)?.name || borrowerId;
+  const status = document.getElementById('editLoanStatus').value;
+  const returnDate = document.getElementById('editLoanReturnDate').value;
+  const deviceId = document.getElementById('editLoanDeviceId').value;
+  const oldLoan = allLoans.find(l=>l.id===id);
+
+  const { error } = await sb.from('loans').update({
+    borrower_id: borrowerId,
+    borrower_name: borrowerName,
+    loan_date: document.getElementById('editLoanDate').value||null,
+    due_date: document.getElementById('editLoanDueDate').value||null,
+    status,
+    return_date: returnDate||null,
+    note: document.getElementById('editLoanNote').value,
+  }).eq('id', id);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+
+  // 기기 상태 업데이트
+  const isRoom = allRooms.some(r=>r.id===deviceId);
+  const table = isRoom ? 'rooms' : 'devices';
+  const newStatus = status==='반납완료' ? (isRoom?'사용가능':'대여가능') :
+                    status==='대여중' ? (isRoom?'사용중':'대여중') : status;
+  await sb.from(table).update({status: newStatus}).eq('id', deviceId);
+
+  closeModal('editLoanModal');
+  showToast('수정 완료! ✅', 'success');
+  await loadAll();
+  renderPage(currentPage);
+}
+
+
+
+function renderPageWithFilter(page, cat, selId, tableId) {
+  populatePrefixFilterCat(cat, selId);
+  // localStorage에서 저장된 필터값 복원
+  const savedPrefix = localStorage.getItem('filter_' + page);
+  const sel = document.getElementById(selId);
+  if (savedPrefix && sel) {
+    // 옵션에 해당 값이 있으면 선택
+    const opt = [...sel.options].find(o => o.value === savedPrefix);
+    if (opt) sel.value = savedPrefix;
+    else sel.value = '';
+  }
+  const prefix = sel?.value || '';
+  const filtered = allDevices.filter(d => {
+    const matchCat = d.category === cat;
+    const matchPrefix = !prefix || getDevicePrefix(d.id) === prefix;
+    return matchCat && matchPrefix;
+  });
+  renderDeviceTable(filtered, tableId, false);
+}
+
+function renderPageKeepFilter() {
+  // 현재 페이지 필터 유지하며 재렌더
+  const page = currentPage;
+  const filterMap = {
+    'notebooks': { input: '#page-notebooks input', sel: '#notebookPrefixFilter', cat: '노트북', table: 'deviceTableNotebook' },
+    'tablets':   { input: '#page-tablets input',   sel: '#tabletPrefixFilter',   cat: '태블릿', table: 'deviceTableTablet' },
+    'tabletKo':  { input: '#page-tabletKo input',  sel: '#tabletKoPrefixFilter', cat: '타블렛', table: 'deviceTableTabletKo' },
+    'webcams':   { input: '#page-webcams input',   sel: '#webcamPrefixFilter',   cat: '웹캠',   table: 'deviceTableWebcam' },
+    'monitors':  { input: '#page-monitors input',  sel: '#monitorPrefixFilter',  cat: '포터블모니터', table: 'deviceTableMonitor' },
+    'others':    { input: '#page-others input',    sel: '#otherPrefixFilter',    cat: '기타기기', table: 'deviceTableOther' },
+  };
+  const cfg = filterMap[page];
+  if (cfg) {
+    renderPageWithFilter(page, cfg.cat, cfg.sel.slice(1), cfg.table);
+    const q = document.querySelector(cfg.input)?.value || '';
+    if (q) filterDevicesCat(q, cfg.cat);
+  } else {
+    renderPage(page);
+  }
+}
+// ── 수정 기능 ─────────────────────────────────────────────────
+function openEditStudent(id) {
+  const s = allStudents.find(x=>x.id===id);
+  if (!s) return;
+  document.getElementById('editStuId').value = s.id;
+  document.getElementById('editStuName').value = s.name||'';
+  document.getElementById('editStuClass').value = s.class_info||'';
+  document.getElementById('editStuStatus').value = s.status||'재학';
+  document.getElementById('editStudentModal').classList.add('open');
+}
+
+async function updateStudent() {
+  const id = document.getElementById('editStuId').value;
+  const { error } = await sb.from('students').update({
+    name: document.getElementById('editStuName').value.trim(),
+    class_info: document.getElementById('editStuClass').value.trim(),
+    status: document.getElementById('editStuStatus').value,
+  }).eq('id', id);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+  closeModal('editStudentModal');
+  showToast('수정 완료! ✅', 'success');
+  await loadStudents(); renderPage(currentPage);
+}
+
+function openEditStaff(id) {
+  const s = allStaff.find(x=>x.id===id);
+  if (!s) return;
+  document.getElementById('editStfId').value = s.id;
+  document.getElementById('editStfRole').value = s.role||'교사';
+  document.getElementById('editStaffModal').classList.add('open');
+}
+
+async function updateStaff() {
+  const id = document.getElementById('editStfId').value;
+  const { error } = await sb.from('staff').update({
+    role: document.getElementById('editStfRole').value,
+  }).eq('id', id);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+  closeModal('editStaffModal');
+  showToast('수정 완료! ✅', 'success');
+  await loadStaff(); renderPage(currentPage);
+}
+
+function openEditDevice(id) {
+  const d = allDevices.find(x=>x.id===id);
+  if (!d) return;
+  document.getElementById('editDevId').value = d.id;
+  document.getElementById('editDevName').value = d.name||'';
+  document.getElementById('editDevCategory').value = d.category||'노트북';
+  document.getElementById('editDevMaker').value = d.maker||'';
+  document.getElementById('editDevModel').value = d.model||'';
+  document.getElementById('editDevLabel').value = d.label||'';
+  document.getElementById('editDevStatus').value = d.status||'대여가능';
+  document.getElementById('editDevPurchase').value = d.purchase_date||'';
+  document.getElementById('editDevWarranty').value = d.warranty_date||'';
+  document.getElementById('editDevNote').value = d.note||'';
+
+  // 대여 정보 섹션 - 수리중/분실이면 숨기기
+  const loanSection = document.getElementById('editDevLoanSection');
+  const isLendable = !['수리중','분실'].includes(d.status);
+  loanSection.style.display = isLendable ? '' : 'none';
+
+  if (isLendable) {
+    const loan = getActiveLoan(id);
+    document.getElementById('editDevLoanId').value = loan?.id||'';
+    document.getElementById('editDevBorrowerId').value = loan?.borrower_id||'';
+    document.getElementById('editDevBorrowerSearch').value = '';
+    document.getElementById('editDevBorrowerDropdown').style.display = 'none';
+    document.getElementById('editDevLoanDate').value = loan?.loan_date||'';
+    document.getElementById('editDevDueDate').value = loan?.due_date||'';
+    const sel = document.getElementById('editDevBorrowerSelected');
+    if (loan?.borrower_name) {
+      const bid = loan.borrower_id && loan.borrower_id !== loan.borrower_name ? ` (${loan.borrower_id})` : '';
+      sel.textContent = `✓ ${loan.borrower_name}${bid}`;
+      sel.style.background = 'var(--lt-green)';
+      sel.style.color = 'var(--green)';
+      document.getElementById('editDevBorrowerId').dataset.name = loan.borrower_name;
+    } else {
+      sel.textContent = '⚠️ 대여자 미지정 — 아래에서 검색하세요';
+      sel.style.background = 'var(--lt-red)';
+      sel.style.color = 'var(--red)';
+    }
+  }
+  document.getElementById('editDeviceModal').classList.add('open');
+}
+
+async function updateDevice() {
+  const id = document.getElementById('editDevId').value;
+  const { error } = await sb.from('devices').update({
+    name: document.getElementById('editDevName').value.trim(),
+    category: document.getElementById('editDevCategory').value,
+    maker: document.getElementById('editDevMaker').value.trim(),
+    model: document.getElementById('editDevModel').value.trim(),
+    label: document.getElementById('editDevLabel').value.trim(),
+    status: document.getElementById('editDevStatus').value,
+    purchase_date: document.getElementById('editDevPurchase').value||null,
+    warranty_date: document.getElementById('editDevWarranty').value||null,
+    note: document.getElementById('editDevNote').value.trim(),
+  }).eq('id', id);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+
+  // 대여 정보 수정 (수리중/분실이면 건너뜀)
+  const devStatus = document.getElementById('editDevStatus').value;
+  const loanId = document.getElementById('editDevLoanId').value;
+  const borrowerId = document.getElementById('editDevBorrowerId').value;
+  const borrowerName = document.getElementById('editDevBorrowerId').dataset.name || borrowerId;
+  const loanDate = document.getElementById('editDevLoanDate').value;
+  const dueDate = document.getElementById('editDevDueDate').value;
+
+  // 수리중/분실로 변경하면 기존 대여 내역 반납완료 처리
+  if (['수리중','분실'].includes(devStatus)) {
+    const activeLoan = getActiveLoan(id);
+    if (activeLoan) {
+      await sb.from('loans').update({ status:'반납완료', return_date: new Date().toISOString().split('T')[0] }).eq('id', activeLoan.id);
+    }
+  } else if (borrowerId) {
+    if (loanId) {
+      // 기존 대여 내역 수정
+      await sb.from('loans').update({
+        borrower_id: borrowerId,
+        borrower_name: borrowerName,
+        loan_date: loanDate||null,
+        due_date: dueDate||null,
+      }).eq('id', loanId);
+    } else {
+      // 대여 내역 새로 생성
+      const lastNum = allLoans.length ? Math.max(...allLoans.map(l=>parseInt(l.id.replace(/\D/g,'')||'0'))) : 0;
+      const newId = 'LN-' + String(lastNum+1).padStart(3,'0');
+      await sb.from('loans').insert([{
+        id: newId, device_id: id,
+        borrower_id: borrowerId, borrower_name: borrowerName,
+        loan_date: loanDate||null, due_date: dueDate||null,
+        status: '대여중'
+      }]);
+      await sb.from('devices').update({status:'대여중'}).eq('id', id);
+    }
+  }
+
+  closeModal('editDeviceModal');
+  showToast('수정 완료! ✅', 'success');
+  await loadAll(); renderPageKeepFilter();
+}
+
+function openEditRoom(id) {
+  const r = allRooms.find(x=>x.id===id);
+  if (!r) return;
+  document.getElementById('editRoomId').value = r.id;
+  document.getElementById('editRoomName').value = r.name||'';
+  document.getElementById('editRoomCategory').value = r.category||'실습실';
+  document.getElementById('editRoomCapacity').value = r.capacity||'';
+  document.getElementById('editRoomNote').value = r.note||'';
+  document.getElementById('editRoomModal').classList.add('open');
+}
+
+async function updateRoom() {
+  const id = document.getElementById('editRoomId').value;
+  const cap = document.getElementById('editRoomCapacity').value;
+  const { error } = await sb.from('rooms').update({
+    name: document.getElementById('editRoomName').value.trim(),
+    category: document.getElementById('editRoomCategory').value,
+    capacity: cap ? parseInt(cap) : null,
+    note: document.getElementById('editRoomNote').value.trim(),
+  }).eq('id', id);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+  closeModal('editRoomModal');
+  showToast('수정 완료! ✅', 'success');
+  await loadRooms(); renderPage(currentPage);
+}
+
+// ── 체크박스 일괄 삭제 ────────────────────────────────────────
+function onCheckChange(type) {
+  const checks = document.querySelectorAll(`.row-check[data-type="${type}"]`);
+  const checked = [...checks].filter(c => c.checked);
+  const countEl = document.getElementById(type==='student' ? 'stuSelCount' : 'stfSelCount');
+  const btnEl = document.getElementById(type==='student' ? 'stuBulkDelBtn' : 'stfBulkDelBtn');
+  const allCheck = document.getElementById(type==='student' ? 'stuCheckAll' : 'stfCheckAll');
+  if (countEl) countEl.textContent = checked.length;
+  if (btnEl) btnEl.style.display = checked.length > 0 ? '' : 'none';
+  if (allCheck) allCheck.indeterminate = checked.length > 0 && checked.length < checks.length;
+  if (allCheck) allCheck.checked = checked.length === checks.length && checks.length > 0;
+}
+
+function toggleSelectAll(type, checked) {
+  document.querySelectorAll(`.row-check[data-type="${type}"]`).forEach(c => {
+    c.checked = checked;
+  });
+  onCheckChange(type);
+}
+
+async function bulkDelete(type) {
+  const checks = [...document.querySelectorAll(`.row-check[data-type="${type}"]:checked`)];
+  if (!checks.length) return;
+  const ids = checks.map(c => c.dataset.id);
+  if (!confirm(`선택한 ${ids.length}명을 삭제하시겠어요?\n삭제하면 복구할 수 없어요.`)) return;
+  const table = type === 'student' ? 'students' : 'staff';
+  let success = 0, fail = 0;
+  for (const id of ids) {
+    const { error } = await sb.from(table).delete().eq('id', id);
+    if (error) fail++; else success++;
+  }
+  showToast(`✅ ${success}명 삭제 완료${fail > 0 ? ` (${fail}명 실패)` : ''}`, 'success');
+  if (type === 'student') { await loadStudents(); renderPage('students'); }
+  else { await loadStaff(); renderPage('staff'); }
+}
+
+async function deleteStudent(id) {
+  if (!confirm('정말 삭제하시겠어요?')) return;
+  await sb.from('students').delete().eq('id', id);
+  showToast('삭제 완료', 'success');
+  await loadStudents();
+  renderPage(currentPage);
+}
+
+async function deleteStaff(id) {
+  if (!confirm('정말 삭제하시겠어요?')) return;
+  await sb.from('staff').delete().eq('id', id);
+  showToast('삭제 완료', 'success');
+  await loadStaff();
+  renderPage(currentPage);
+}
+
+async function deleteDevice(id) {
+  if (!confirm(`기기 "${id}"를 삭제하시겠어요?\n대여 이력은 유지됩니다.`)) return;
+  const { error } = await sb.from('devices').delete().eq('id', id);
+  if (error) { showToast('오류: ' + error.message, 'error'); return; }
+  showToast('기기 삭제 완료', 'success');
+  await loadDevices();
+  renderPage(currentPage);
+}
+
+async function deleteLoan(loanId, deviceId, status) {
+  if (!confirm('대여 내역을 삭제하시겠어요?\n삭제하면 복구할 수 없어요.')) return;
+  const { error } = await sb.from('loans').delete().eq('id', loanId);
+  if (error) { showToast('오류: ' + error.message, 'error'); return; }
+  // 대여중/연체 상태였다면 기기를 대여가능으로 복구
+  if (['대여중','연체'].includes(status)) {
+    await sb.from('devices').update({ status: '대여가능' }).eq('id', deviceId);
+  }
+  showToast('대여 내역 삭제 완료', 'success');
+  await loadAll();
+  renderPage(currentPage);
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+function switchBulkTab(type) {
+  ['device','student','staff','loan'].forEach(t => {
+    document.getElementById('bulk-'+t).style.display = t===type ? 'block' : 'none';
+  });
+  document.querySelectorAll('#bulkTabs .tab').forEach((tab, i) => {
+    tab.classList.toggle('active', ['device','student','staff','loan'][i] === type);
+  });
+}
+
+function cleanCell(val) {
+  val = (val||'').trim();
+  // 엑셀 오류값 제거
+  if (/^#(VALUE|REF|DIV\/0|N\/A|NAME|NULL|NUM)!?$/.test(val)) return '';
+  return val;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let c of line) {
+    if (c === '"') inQ = !inQ;
+    else if (c === ',' && !inQ) { result.push(cleanCell(cur)); cur = ''; }
+    else cur += c;
+  }
+  result.push(cleanCell(cur));
+  return result;
+}
+
+function parseCSVText(text) {
+  return text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#') && !l.startsWith('#VALUE')).map(parseCSVLine);
+}
+
+function previewBulkFile(type) {
+  const input = document.getElementById(type + 'CsvFile');
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    let rows = parseCSVText(text);
+    // 헤더 행 자동 감지 (한글/영문 헤더 모두 처리)
+    const firstCell = (rows[0]?.[0] || '').toLowerCase().replace(/\s/g,'');
+    const headerKeywords = ['기기id','학번','교직원번호','id','device','이름','name','번호'];
+    if (headerKeywords.some(k => firstCell.includes(k))) rows = rows.slice(1);
+    rows = rows.filter(r => r[0]);
+    bulkParsedData[type] = rows;
+    const previewEl = document.getElementById(type + 'FilePreview');
+    const countEl = document.getElementById(type + 'PreviewCount');
+    const tbodyEl = document.getElementById(type + 'PreviewTable');
+    previewEl.style.display = 'block';
+    countEl.textContent = `총 ${rows.length}건 인식됨`;
+    if (type === 'device') {
+      // 열순서: 기기ID, 기기명, 종류, 제조사, 모델명, 라벨번호, 상태, 구매일
+      tbodyEl.innerHTML = rows.slice(0,5).map(r => `<tr><td>${r[0]||''}</td><td>${r[1]||''}</td><td>${r[2]||''}</td><td>${r[3]||''}</td><td>${r[5]||''}</td><td>${r[6]||'대여가능'}</td></tr>`).join('');
+    } else if (type === 'student') {
+      tbodyEl.innerHTML = rows.slice(0,5).map(r => `<tr><td>${r[0]||''}</td><td>${r[1]||''}</td><td>${r[2]||''}</td><td>${r[3]||'재학'}</td></tr>`).join('');
+    } else if (type === 'loan') {
+      tbodyEl.innerHTML = rows.slice(0,5).map(r => {
+        const borrowerRaw = (r[4]||'').trim();
+        const spaceIdx = borrowerRaw.indexOf(' ');
+        const studentId = spaceIdx > 0 ? borrowerRaw.substring(0, spaceIdx) : borrowerRaw;
+        const studentName = spaceIdx > 0 ? borrowerRaw.substring(spaceIdx+1) : '';
+        return `<tr><td>${r[6]||''}</td><td>${studentId} ${studentName}</td><td>${r[1]||''}</td><td>${r[2]||''}</td></tr>`;
+      }).join('');
+    } else {
+      tbodyEl.innerHTML = rows.slice(0,5).map(r => `<tr><td>${r[0]||''}</td><td>${r[1]||''}</td></tr>`).join('');
+    }
+    if (rows.length > 5) tbodyEl.innerHTML += `<tr><td colspan="6" style="color:var(--text-muted);font-size:12px">... 외 ${rows.length-5}건</td></tr>`;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+async function uploadBulk(type) {
+  const rows = bulkParsedData[type];
+  if (!rows.length) { showToast('데이터가 없어요', 'error'); return; }
+  await insertBulkRows(type, rows);
+}
+
+async function bulkTextInput(type) {
+  const text = document.getElementById(type + 'BulkText').value.trim();
+  if (!text) { showToast('내용을 입력해주세요', 'error'); return; }
+  const rows = parseCSVText(text).filter(r => r[0]);
+  if (!rows.length) { showToast('올바른 형식으로 입력해주세요', 'error'); return; }
+  await insertBulkRows(type, rows, type + 'BulkResult');
+}
+
+async function insertBulkRows(type, rows, resultId) {
+  let records = [];
+  if (type === 'device') {
+    // 열 순서: 기기ID, 기기명, 종류, 제조사, 모델명, 라벨번호, 상태, 구매일
+    records = rows.map(r => ({
+      id: r[0], name: r[1]||'',
+      category: (r[2]||'기타전자기기').trim(),
+      maker: r[3]||'', model: r[4]||'', label: r[5]||'',
+      status: r[6]||'대여가능',
+      purchase_date: parseDate(r[7]),
+      warranty_date: null, note: r[8]||''
+    }));
+  } else if (type === 'student') {
+    records = rows.map(r => {
+      const id = (r[0]||'').trim();
+      const name = (r[1]||'').trim();
+      const status = (r[3]||'재학').trim();
+      // 학번 없으면 TEMP-이름으로 자동 생성
+      const finalId = id || (name ? 'TEMP-' + name : '');
+      return {
+        id: finalId,
+        name,
+        class_info: (r[2]||'').trim(),
+        status,
+      };
+    }).filter(r => r.id && r.name);
+  } else if (type === 'loan') {
+    records = rows.map(r => {
+      const borrowerRaw = (r[4]||'').trim();
+      const spaceIdx = borrowerRaw.indexOf(' ');
+      const studentId = spaceIdx > 0 ? borrowerRaw.substring(0, spaceIdx).trim() : borrowerRaw;
+      const studentName = spaceIdx > 0 ? borrowerRaw.substring(spaceIdx+1).trim() : '';
+      const deviceId = (r[6]||'').trim();
+      const loanDate = parseDate(r[1]);
+      const dueDate = parseDate(r[2]);
+      return { studentId, studentName, deviceId, loanDate, dueDate };
+    }).filter(r => r.deviceId && r.studentId);
+  } else {
+    records = rows.map(r => ({ id: r[0], name: r[0], role: r[1]||'교사' }));
+  }
+  if (type === 'loan') { await insertBulkLoans(records); return; }
+  const table = type === 'device' ? 'devices' : type === 'student' ? 'students' : 'staff';
+  let success = 0, fail = 0;
+  for (const rec of records) {
+    const { error } = await sb.from(table).upsert(rec);
+    if (error) fail++; else success++;
+  }
+  const msg = `✅ ${success}건 등록 완료${fail > 0 ? ` (${fail}건 실패)` : ''}`;
+  if (resultId) document.getElementById(resultId).textContent = msg;
+  showToast(msg, 'success');
+  await loadAll();
+}
+
+function guessCategory(id, name) {
+  const s = ((id||'') + (name||'')).toLowerCase();
+  if (s.includes('노트북') || s.includes('nb') || s.includes('nss') || s.includes('lgn') || s.includes('laptop')) return '노트북';
+  if (s.includes('태블릿') || s.includes('tb') || s.includes('ipad') || s.includes('tab')) return '태블릿';
+  return '기타전자기기';
+}
+
+function parseDate(val) {
+  if (!val) return null;
+  val = val.trim();
+  // 2026. 3. 20 → 2026-03-20
+  const dotMatch = val.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+  if (dotMatch) return `${dotMatch[1]}-${dotMatch[2].padStart(2,'0')}-${dotMatch[3].padStart(2,'0')}`;
+  // 2026-03-20 or 2026/03/20
+  const dashMatch = val.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (dashMatch) return `${dashMatch[1]}-${dashMatch[2].padStart(2,'0')}-${dashMatch[3].padStart(2,'0')}`;
+  return null;
+}
+
+function downloadTemplate(type) {
+  const templates = {
+    device: '기기ID,기기명,종류,제조사,모델명,라벨번호,상태,구매일\nNSS025,삼성노트북-025,노트북,삼성,,20200221-NSS025,대여가능,2026-03-20\nLGN001,LG노트북-001,노트북,LG,,20200918-LGN001,대여중,2020-09-18',
+    student: '학번,이름,학년/반,상태\n20240001,홍길동,2학년 1반,재학\n20240002,김철수,2학년 1반,재학\n20240003,이영희,3학년 2반,재학',
+    staff: '이름,구분\n김선생,교사\n이교감,교직원\n박선생,교사',
+  };
+  const templates_loan = '번호,대여일,반납예정일,대여기간,대여자(학번 이름),빈칸,기기ID\n693,2026.03.11,2026.07.13,114,2605 노유진,,LGG029\n694,2026.03.12,2026.07.13,114,1102 김민성,,LGN001';
+  if (type === 'loan') {
+    const blob = new Blob(['\uFEFF' + templates_loan], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '대여내역_양식.csv'; a.click(); return;
+  }
+  const names = { device:'기기_양식', student:'학생_양식', staff:'교직원_양식' };
+  const blob = new Blob(['\uFEFF' + templates[type]], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = names[type] + '.csv';
+  a.click();
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+
+// ── 기기 종류 판별 ────────────────────────────────────────────
+function isNotebook(cat) {
+  return /노트북|laptop|notebook/i.test(cat||'');
+}
+function isTablet(cat) {
+  return /태블릿|타블렛|tablet|ipad/i.test(cat||'');
+}
+
+
+function filterDevicesCat(q, category) {
+  const prefixSelMap = {
+    '타블렛':'tabletKoPrefixFilter', '웹캠':'webcamPrefixFilter',
+    '포터블모니터':'monitorPrefixFilter', '기타기기':'otherPrefixFilter'
+  };
+  const tableMap = {
+    '타블렛':'deviceTableTabletKo', '웹캠':'deviceTableWebcam',
+    '포터블모니터':'deviceTableMonitor', '기타기기':'deviceTableOther'
+  };
+  const selId = prefixSelMap[category];
+  const prefix = selId ? (document.getElementById(selId)?.value||'') : '';
+  const filtered = allDevices.filter(d => {
+    const matchCat = d.category === category;
+    const matchQ = !q || [d.id,d.name,d.maker,d.model,d.label].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()));
+    const matchPrefix = !prefix || getDevicePrefix(d.id) === prefix;
+    return matchCat && matchQ && matchPrefix;
+  });
+  renderDeviceTable(filtered, tableMap[category]||'deviceTableOther', false);
+}
+
+function populatePrefixFilterCat(category, selId) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  const current = sel.value;
+  const devices = allDevices.filter(d => d.category === category);
+  const prefixes = [...new Set(devices.map(d => getDevicePrefix(d.id)).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">전체 ID</option>' + prefixes.map(p => {
+    const count = devices.filter(d => getDevicePrefix(d.id) === p).length;
+    return `<option value="${p}" ${current===p?'selected':''}>${p} (${count}대)</option>`;
+  }).join('');
+}
+
+// ── 바코드 스캔 ────────────────────────────────────────────────
+let cameraStream = null;
+let scanInterval = null;
+let jsQRLoaded = false;
+let quickLoanDeviceId = null;
+let quickReturnLoanId = null;
+
+function initScanPage() {
+  const today = new Date().toISOString().split('T')[0];
+  const due = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
+  if (document.getElementById('quickDueDate')) document.getElementById('quickDueDate').value = due;
+  if (document.getElementById('quickReturnDate')) document.getElementById('quickReturnDate').value = today;
+  // populate borrower dropdown
+  const bSel = document.getElementById('quickBorrowerId');
+  if (bSel) {
+    const stuOpts = allStudents.filter(s=>s.status==='재학').map(s=>`<option value="${s.id}" data-name="${s.name}">[학생] ${s.class_info||''} ${s.name} (${s.id})</option>`).join('');
+    const stfOpts = allStaff.map(s=>`<option value="${s.id}" data-name="${s.name}">[${s.role||'교직원'}] ${s.name}</option>`).join('');
+    bSel.innerHTML = '<option value="">선택...</option>' + stuOpts + stfOpts;
+  }
+}
+
+function onQuickBorrowerChange() {
+  const sel = document.getElementById('quickBorrowerId');
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('quickBorrowerName').value = opt.dataset.name || '';
+}
+
+function processScan(val) {
+  val = (val||'').trim();
+  if (!val) return;
+  // 기기/공간 검색
+  const device = allDevices.find(d => d.id === val || d.label === val);
+  const room = allRooms.find(r => r.id === val);
+  const target = device || room;
+  if (target) {
+    showScanResult(target, device ? 'device' : 'room');
+    return;
+  }
+  // 학생/교직원 검색
+  const stu = allStudents.find(s => s.id===val);
+  const stf = allStaff.find(s => s.id===val);
+  const person = stu || stf;
+  if (person) {
+    showPersonResult(person, stu ? 'student' : 'staff');
+    return;
+  }
+  showToast(`"${val}" — 등록된 기기/학생을 찾을 수 없어요`, 'error');
+}
+
+function showScanResult(target, type) {
+  const card = document.getElementById('scanResultCard');
+  const header = document.getElementById('scanResultHeader');
+  const title = document.getElementById('scanResultTitle');
+  const body = document.getElementById('scanResultBody');
+  card.style.display = '';
+  const loan = allLoans.find(l => l.device_id===target.id && ['대여중','연체'].includes(l.status));
+  const statusMap = { '대여가능':'available', '대여중':'lent', '연체':'overdue', '수리중':'repair', '사용가능':'available', '사용중':'lent' };
+  const st = target.status || '대여가능';
+  header.style.background = st==='대여가능'||st==='사용가능' ? 'var(--lt-green)' : st==='연체' ? 'var(--lt-red)' : 'var(--lt-blue)';
+  title.style.color = st==='대여가능'||st==='사용가능' ? 'var(--green)' : st==='연체' ? 'var(--red)' : 'var(--blue)';
+  title.textContent = type==='room' ? '🏫 공간 조회 결과' : '💻 기기 조회 결과';
+
+  body.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:var(--navy)">${target.name}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${target.id}${target.maker ? ' · '+target.maker : ''}${target.model ? ' '+target.model : ''}</div>
+      </div>
+      <span class="badge badge-${statusMap[st]||'available'}" style="font-size:13px;padding:6px 12px">${st}</span>
+    </div>
+    ${loan ? `<div style="background:var(--lt-blue);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px">
+      <strong>대여자:</strong> ${loan.borrower_name} &nbsp;|&nbsp; <strong>반납예정:</strong> ${loan.due_date}
+    </div>` : ''}
+    <div style="display:flex;gap:8px">
+      ${(st==='대여가능'||st==='사용가능') ? `<button class="btn btn-primary" onclick="openQuickLoan('${target.id}')">⚡ 대여 등록</button>` : ''}
+      ${loan ? `<button class="btn btn-success" onclick="openQuickReturn('${loan.id}','${loan.borrower_name}','${target.name}')">📤 반납 처리</button>` : ''}
+    </div>`;
+
+  quickLoanDeviceId = target.id;
+  document.getElementById('quickDeviceId').value = target.id + ' — ' + target.name;
+  document.getElementById('quickLoanPanel').style.display = loan ? 'none' : '';
+  document.getElementById('quickReturnPanel').style.display = loan ? '' : 'none';
+}
+
+function showPersonResult(person, type) {
+  const card = document.getElementById('scanResultCard');
+  const title = document.getElementById('scanResultTitle');
+  const body = document.getElementById('scanResultBody');
+  const header = document.getElementById('scanResultHeader');
+  card.style.display = '';
+  header.style.background = 'var(--lt-purple)';
+  title.style.color = 'var(--purple)';
+  title.textContent = type==='student' ? '👤 학생 조회 결과' : '👩‍🏫 교직원 조회 결과';
+  const activeLoans = allLoans.filter(l => l.borrower_id===person.id && ['대여중','연체'].includes(l.status));
+  body.innerHTML = `
+    <div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px">${person.display_name||person.name}</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${person.class_info||person.role||''} · ${person.id}</div>
+    <div style="font-size:13px;font-weight:500;margin-bottom:8px">현재 대여 중: ${activeLoans.length}건</div>
+    ${activeLoans.map(l => {
+      const dev = allDevices.find(d=>d.id===l.device_id) || allRooms.find(r=>r.id===l.device_id);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--lt-blue);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:13px">
+        <span>${dev?.name||l.device_id} — 반납예정 ${l.due_date}</span>
+        <button class="btn btn-success btn-sm" onclick="openQuickReturn('${l.id}','${l.borrower_name}','${dev?.name||l.device_id}')">반납</button>
+      </div>`;
+    }).join('')}`;
+  document.getElementById('quickLoanPanel').style.display = 'none';
+  document.getElementById('quickReturnPanel').style.display = 'none';
+}
+
+function openQuickLoan(deviceId) {
+  quickLoanDeviceId = deviceId;
+  document.getElementById('quickLoanPanel').style.display = '';
+  document.getElementById('quickReturnPanel').style.display = 'none';
+  initScanPage();
+  document.getElementById('quickDeviceId').value = deviceId;
+}
+
+function openQuickReturn(loanId, borrowerName, deviceName) {
+  quickReturnLoanId = loanId;
+  document.getElementById('quickReturnPanel').style.display = '';
+  document.getElementById('quickLoanPanel').style.display = 'none';
+  document.getElementById('quickReturnInfo').innerHTML = `<strong>${borrowerName}</strong>님이 대여한 <strong>${deviceName}</strong>을 반납 처리합니다.`;
+  document.getElementById('quickReturnDate').value = new Date().toISOString().split('T')[0];
+}
+
+async function saveQuickLoan() {
+  const borrowerId = document.getElementById('quickBorrowerId').value;
+  const borrowerName = document.getElementById('quickBorrowerName').value;
+  const dueDate = document.getElementById('quickDueDate').value;
+  if (!quickLoanDeviceId||!borrowerId||!dueDate) { showToast('기기·대여자·반납예정일을 모두 선택해주세요', 'error'); return; }
+  const lastId = allLoans.length ? parseInt(allLoans.map(l=>l.id.replace('LN-','')).sort().pop())||0 : 0;
+  const id = 'LN-' + String(lastId+1).padStart(3,'0');
+  const loanDate = new Date().toISOString().split('T')[0];
+  const { error } = await sb.from('loans').insert([{ id, device_id:quickLoanDeviceId, borrower_id:borrowerId, borrower_name:borrowerName, loan_date:loanDate, due_date:dueDate, status:'대여중' }]);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+  const isRoom = allRooms.some(r=>r.id===quickLoanDeviceId);
+  if (isRoom) await sb.from('rooms').update({status:'사용중'}).eq('id', quickLoanDeviceId);
+  else await sb.from('devices').update({status:'대여중'}).eq('id', quickLoanDeviceId);
+  showToast('대여 등록 완료! ✅', 'success');
+  await loadAll();
+  document.getElementById('quickLoanPanel').style.display = 'none';
+  document.getElementById('scanResultCard').style.display = 'none';
+}
+
+async function saveQuickReturn() {
+  if (!quickReturnLoanId) return;
+  const returnDate = document.getElementById('quickReturnDate').value;
+  const loan = allLoans.find(l=>l.id===quickReturnLoanId);
+  await sb.from('loans').update({status:'반납완료', return_date:returnDate}).eq('id', quickReturnLoanId);
+  const isRoom = allRooms.some(r=>r.id===loan?.device_id);
+  if (isRoom) await sb.from('rooms').update({status:'사용가능'}).eq('id', loan.device_id);
+  else await sb.from('devices').update({status:'대여가능'}).eq('id', loan?.device_id);
+  showToast('반납 완료! ✅', 'success');
+  await loadAll();
+  document.getElementById('quickReturnPanel').style.display = 'none';
+  document.getElementById('scanResultCard').style.display = 'none';
+}
+
+// 카메라 스캔
+async function toggleCamera() {
+  const btn = document.getElementById('cameraBtnToggle');
+  if (cameraStream) {
+    stopCamera();
+    btn.textContent = '카메라 켜기';
+    return;
+  }
+  try {
+    if (!jsQRLoaded) {
+      await loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js');
+      jsQRLoaded = true;
+    }
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } });
+    const video = document.getElementById('cameraVideo');
+    video.srcObject = cameraStream;
+    await video.play();
+    document.getElementById('cameraContainer').style.display = '';
+    document.getElementById('cameraOff').style.display = 'none';
+    btn.textContent = '카메라 끄기';
+    scanInterval = setInterval(scanFrame, 200);
+  } catch(e) {
+    showToast('카메라 접근 실패: ' + e.message, 'error');
+  }
+}
+
+function stopCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t=>t.stop()); cameraStream = null; }
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  document.getElementById('cameraContainer').style.display = 'none';
+  document.getElementById('cameraOff').style.display = '';
+}
+
+function scanFrame() {
+  const video = document.getElementById('cameraVideo');
+  if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+  const canvas = document.getElementById('cameraCanvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const code = jsQR(imageData.data, imageData.width, imageData.height);
+  if (code && code.data) {
+    stopCamera();
+    document.getElementById('cameraBtnToggle').textContent = '카메라 켜기';
+    showToast('스캔 완료: ' + code.data, 'success');
+    processScan(code.data);
+  }
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+
+async function insertBulkLoans(records) {
+  let success = 0, fail = 0, skip = 0;
+  const lastId = allLoans.length ? parseInt(allLoans.map(l=>l.id.replace(/\D/g,'')||'0').sort((a,b)=>+b-+a)[0])||0 : 0;
+  let counter = lastId + 1;
+
+  for (const rec of records) {
+    // 학생 이름 조회
+    const stu = allStudents.find(s => s.id === rec.studentId);
+    const borrowerName = stu?.name || rec.studentName || rec.studentId;
+
+    // 이미 해당 기기에 대여중인 내역 있으면 skip
+    const existing = allLoans.find(l => l.device_id === rec.deviceId && ['대여중','연체'].includes(l.status));
+    if (existing) { skip++; continue; }
+
+    const loanId = 'LN-' + String(counter).padStart(3,'0');
+    counter++;
+
+    const { error } = await sb.from('loans').insert([{
+      id: loanId,
+      device_id: rec.deviceId,
+      borrower_id: rec.studentId,
+      borrower_name: borrowerName,
+      loan_date: rec.loanDate||null,
+      due_date: rec.dueDate||null,
+      status: '대여중',
+    }]);
+
+    if (error) { fail++; }
+    else {
+      // 기기 상태 대여중으로 업데이트
+      await sb.from('devices').update({ status:'대여중' }).eq('id', rec.deviceId);
+      success++;
+    }
+  }
+
+  const msg = `✅ ${success}건 등록${skip>0?' ('+skip+'건 중복 skip)':''}${fail>0?' ('+fail+'건 실패)':''}`;
+  showToast(msg, 'success');
+  await loadAll();
+}
+
+async function loadRooms() {
+  const { data, error } = await sb.from('rooms').select('*').order('id');
+  if (!error) allRooms = data || [];
+}
+
+function renderRoomTable(rooms, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!rooms.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">🏫</div><p>등록된 공간이 없어요</p></div></td></tr>`; return; }
+  tbody.innerHTML = rooms.map(r => {
+    const loan = allLoans.find(l => l.device_id === r.id && ['대여중','연체'].includes(l.status));
+    const borrower = loan ? loan.borrower_name : '-';
+    const dueDate = loan ? loan.due_date : '-';
+    const catColor = r.category==='실습실' ? 'lent' : r.category==='도서관' ? 'available' : 'repair';
+    return `<tr>
+      <td style="font-weight:600">${r.name}</td>
+      <td><span class="badge badge-${catColor}">${r.category||'-'}</span></td>
+      <td style="text-align:center">${r.capacity||'-'}</td>
+      <td>${statusBadge(r.status||'사용가능')}</td>
+      <td>${borrower}</td>
+      <td>${dueDate}</td>
+      <td style="white-space:nowrap;display:flex;gap:4px;">
+        ${(r.status||'사용가능')==='사용가능' ? `<button class="btn btn-primary btn-sm" onclick="quickLendRoom('${r.id}')">대여</button>` : ''}
+        ${r.status==='사용중' ? `<button class="btn btn-success btn-sm" data-lid="${loan?.id||''}" data-did="${r.id}" data-name="${r.name}" data-borrower="${borrower}" onclick="openReturnByDevice(this)">반납</button>` : ''}
+        <button class="btn btn-outline btn-sm" data-id="${r.id}" onclick="openEditRoom(this.dataset.id)">수정</button>
+        <button class="btn btn-danger btn-sm" data-id="${r.id}" onclick="deleteRoom(this.dataset.id)">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterRooms(q) {
+  const filtered = allRooms.filter(r => !q || [r.id,r.name,r.category].some(v=>(v||'').toLowerCase().includes(q.toLowerCase())));
+  renderRoomTable(filtered, 'roomTable');
+}
+
+function filterRoomStatus(status) {
+  const filtered = allRooms.filter(r => !status || r.status === status);
+  renderRoomTable(filtered, 'roomTable');
+}
+
+function openRoomModal() {
+  ['roomName','roomCapacity','roomNote'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('roomCategory').value = '실습실';
+  document.getElementById('roomModal').classList.add('open');
+}
+
+async function saveRoom() {
+  const name = document.getElementById('roomName').value.trim();
+  if (!name) { showToast('공간명은 필수예요', 'error'); return; }
+  const id = name;
+  const cap = document.getElementById('roomCapacity').value;
+  const { error } = await sb.from('rooms').insert([{
+    id, name, category: document.getElementById('roomCategory').value,
+    capacity: cap ? parseInt(cap) : null,
+    status: '사용가능', note: document.getElementById('roomNote').value
+  }]);
+  if (error) { showToast('오류: '+error.message, 'error'); return; }
+  closeModal('roomModal');
+  showToast('공간 추가 완료! ✅', 'success');
+  await loadRooms();
+  renderPage(currentPage);
+}
+
+async function deleteRoom(id) {
+  if (!confirm(`공간 "${id}"를 삭제하시겠어요?`)) return;
+  await sb.from('rooms').delete().eq('id', id);
+  showToast('삭제 완료', 'success');
+  await loadRooms();
+  renderPage(currentPage);
+}
+
+function quickLendRoom(roomId) {
+  openLoanModal();
+  setTimeout(() => {
+    const room = allRooms.find(r=>r.id===roomId);
+    if (room) selectLoanDevice(roomId, room.name, '공간');
+  }, 50);
+}
+</script>
+</body>
+</html>
