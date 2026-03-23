@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>기기 대여 관리 시스템</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -55,6 +55,7 @@
 
   /* KPI Grid */
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  #kpiGrid { grid-template-columns: repeat(6, 1fr); }
   .kpi { background: white; border-radius: 12px; padding: 16px 20px; border: 1px solid var(--mid-gray); }
   .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; }
   .kpi-value { font-size: 28px; font-weight: 700; }
@@ -145,11 +146,76 @@
   .config-card .form-group { margin-bottom: 14px; }
 
   @media (max-width: 768px) {
-    .sidebar { transform: translateX(-100%); }
+    .sidebar { transform: translateX(-100%); transition: transform 0.25s; z-index: 300; }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:299; }
+    .sidebar-backdrop.open { display:block; }
     .main { margin-left: 0; }
     .form-grid { grid-template-columns: 1fr; }
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .content { padding: 12px; }
+    .topbar { padding: 0 14px; }
+    .row { flex-direction: column; }
+
+    /* KPI 그리드 모바일 - 3열로 */
+    #kpiGrid { grid-template-columns: repeat(3, 1fr) !important; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .kpi { padding: 8px 10px; border-radius: 8px; }
+    .kpi-value { font-size: 18px; }
+    .kpi-label { font-size: 10px; margin-bottom: 2px; }
+    #kpiGrid .kpi-value { font-size: 16px; }
+    #kpiGrid .kpi { padding: 8px; }
+
+    /* 대시보드 카드 여백 축소 */
+    #page-dashboard .card { margin-bottom: 12px !important; }
+    #page-dashboard .card-header { padding: 10px 14px; }
+    #page-dashboard .kpi-grid { margin-bottom: 10px !important; }
+    #kpiGrid { margin-bottom: 8px !important; }
+
+    /* 모바일 햄버거 버튼 */
+    .mobile-menu-btn { display:flex !important; }
+
+    /* 테이블 → 카드 변환 */
+    .mobile-card-list { display:flex; flex-direction:column; gap:10px; }
+    .mobile-card { background:white; border-radius:12px; border:1px solid var(--mid-gray); padding:14px 16px; }
+    .mobile-card-row { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+    .mobile-card-row:last-child { margin-bottom:0; }
+    .mobile-card-label { font-size:11px; color:var(--text-muted); font-weight:600; margin-bottom:2px; }
+    .mobile-card-value { font-size:13px; font-weight:500; }
+    .mobile-card-actions { display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+    .mobile-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--mid-gray); }
+    .mobile-card-title { font-size:15px; font-weight:700; color:var(--navy); }
+    .mobile-card-sub { font-size:11px; color:var(--text-muted); font-family:monospace; margin-top:2px; }
+    .mobile-card-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+    /* 대시보드 테이블은 스크롤로 표시 */
+    #page-dashboard .table-wrap { display:block !important; overflow-x:auto; }
+    /* 대시보드 외 페이지 테이블 숨김 */
+    .page:not(#page-dashboard) .table-wrap { display:none; }
+    .mobile-cards { display:block; }
+
+    /* 대시보드 테이블 폰트/패딩 축소 */
+    #page-dashboard th { padding: 6px 8px; font-size: 10px; }
+    #page-dashboard td { padding: 7px 8px; font-size: 12px; }
+
+    /* 검색바 */
+    .search-bar { flex-direction:column; gap:8px; }
+    .search-bar select { width:100%; }
+    .search-input { min-width:unset; width:100%; }
+
+    /* topbar 우측 사용자 이름 숨김 (로그아웃 버튼만 표시) */
+    #userInfo { display:none !important; }
+    .topbar-right > div { border-left: none !important; padding-left: 0 !important; margin-left: 4px !important; }
   }
+
+  @media (min-width: 769px) {
+    .mobile-cards { display:none; }
+    .mobile-menu-btn { display:none !important; }
+    .sidebar-backdrop { display:none !important; }
+  }
+
+  .mobile-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; color:var(--navy); font-size:22px; margin-right:8px; }
+
+  .mobile-card-list { display:flex; flex-direction:column; gap:10px; }
 
   .search-dropdown-item { padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:0.5px solid var(--gray); }
   .search-dropdown-item:last-child { border-bottom:none; }
@@ -205,8 +271,9 @@
   </div>
 </div>
 
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
 <div id="app" style="display:none;">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <h1 style="white-space:nowrap;font-size:13px">🖥️ 기기 대여 관리 시스템</h1>
       <p>미림 기기 대여 플랫폼</p>
@@ -242,7 +309,10 @@
 
   <div class="main">
     <div class="topbar">
-      <div class="topbar-title" id="pageTitle">대시보드</div>
+      <div style="display:flex;align-items:center;">
+        <button class="mobile-menu-btn" onclick="openSidebar()">☰</button>
+        <div class="topbar-title" id="pageTitle">대시보드</div>
+      </div>
       <div class="topbar-right">
         <button class="btn btn-primary btn-sm" id="topAddBtn" onclick="openAddModal()" style="display:none">+ 추가</button>
         <button class="btn btn-success btn-sm" id="lendBtn" onclick="openLoanModal()" style="display:none">📋 대여 등록</button>
@@ -258,13 +328,13 @@
       <!-- 대시보드 -->
       <div class="page active" id="page-dashboard">
         <!-- 기기 현황 -->
-        <div class="kpi-grid" id="kpiGrid" style="grid-template-columns:repeat(6,1fr);margin-bottom:12px">
+        <div class="kpi-grid" id="kpiGrid" style="margin-bottom:12px">
           <div class="kpi" onclick="showPage('devices')" style="cursor:pointer" title="전체 기기로 이동"><div class="kpi-label">전체 기기</div><div class="kpi-value" id="kpi-total">-</div></div>
-          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='대여가능';filterDeviceStatus('대여가능','all');},100)" style="cursor:pointer" title="대여가능 기기 보기"><div class="kpi-label">대여 가능</div><div class="kpi-value" style="color:var(--green)" id="kpi-available">-</div></div>
-          <div class="kpi" onclick="showPage('loans');setTimeout(()=>{document.getElementById('loanStatusFilter').value='대여중';filterLoans('');},100)" style="cursor:pointer" title="대여현황으로 이동"><div class="kpi-label">대여 중</div><div class="kpi-value" style="color:var(--blue)" id="kpi-lent">-</div></div>
+          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='대여가능';filterDevices(document.querySelector('#page-devices .search-input')?.value||'','all');},150)" style="cursor:pointer" title="대여가능 기기 보기"><div class="kpi-label">대여 가능</div><div class="kpi-value" style="color:var(--green)" id="kpi-available">-</div></div>
+          <div class="kpi" onclick="showPage('loans');setTimeout(()=>{document.getElementById('loanStatusFilter').value='대여중';filterLoans('');},150)" style="cursor:pointer" title="대여현황으로 이동"><div class="kpi-label">대여 중</div><div class="kpi-value" style="color:var(--blue)" id="kpi-lent">-</div></div>
           <div class="kpi" onclick="showPage('overdue')" style="cursor:pointer" title="연체현황으로 이동"><div class="kpi-label">연체</div><div class="kpi-value" style="color:var(--red)" id="kpi-overdue">-</div></div>
-          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='수리중';filterDeviceStatus('수리중','all');},100)" style="cursor:pointer" title="수리중 기기 보기"><div class="kpi-label">수리중</div><div class="kpi-value" style="color:var(--amber)" id="kpi-repair">-</div></div>
-          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='분실';filterDeviceStatus('분실','all');},100)" style="cursor:pointer" title="분실 기기 보기"><div class="kpi-label">분실</div><div class="kpi-value" style="color:var(--red)" id="kpi-lost">-</div></div>
+          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='수리중';filterDevices(document.querySelector('#page-devices .search-input')?.value||'','all');},150)" style="cursor:pointer" title="수리중 기기 보기"><div class="kpi-label">수리중</div><div class="kpi-value" style="color:var(--amber)" id="kpi-repair">-</div></div>
+          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='분실';filterDevices(document.querySelector('#page-devices .search-input')?.value||'','all');},150)" style="cursor:pointer" title="분실 기기 보기"><div class="kpi-label">분실</div><div class="kpi-value" style="color:var(--red)" id="kpi-lost">-</div></div>
         </div>
         <!-- 인원 현황 -->
         <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:20px">
@@ -274,8 +344,8 @@
         <!-- 종류별 현황 -->
         <div class="card" style="margin-bottom:20px">
           <div class="card-header"><div class="card-title">📊 기기 종류별 현황</div></div>
-          <div class="table-wrap">
-            <table>
+          <div class="table-wrap" style="overflow-x:auto">
+            <table style="min-width:400px">
               <thead><tr><th>종류</th><th style="text-align:center;color:var(--green)">대여가능</th><th style="text-align:center;color:var(--blue)">대여중</th><th style="text-align:center;color:var(--red)">연체</th><th style="text-align:center;color:var(--amber)">수리중</th><th style="text-align:center;color:var(--red)">분실</th><th style="text-align:center">합계</th></tr></thead>
               <tbody id="categoryStatTable"></tbody>
             </table>
@@ -286,7 +356,7 @@
           <div class="col">
             <div class="card">
               <div class="card-header"><div class="card-title">⚠️ 연체 기기</div></div>
-              <div class="table-wrap"><table>
+              <div class="table-wrap" style="overflow-x:auto"><table style="min-width:380px">
                 <thead><tr><th>기기</th><th>대여자</th><th>반납예정일</th><th>연체일수</th><th></th></tr></thead>
                 <tbody id="overdueTableDash"></tbody>
               </table></div>
@@ -295,7 +365,7 @@
           <div class="col">
             <div class="card">
               <div class="card-header"><div class="card-title">📋 최근 대여</div></div>
-              <div class="table-wrap"><table>
+              <div class="table-wrap" style="overflow-x:auto"><table style="min-width:320px">
                 <thead><tr><th>기기</th><th>대여자</th><th>대여일</th><th>상태</th></tr></thead>
                 <tbody id="recentLoansTable"></tbody>
               </table></div>
@@ -308,10 +378,10 @@
       <div class="page" id="page-devices">
         <div class="search-bar">
           <input class="search-input" type="text" placeholder="기기명, 제조사, 모델명 검색..." oninput="filterDevices(this.value,'all')" />
-          <select id="allCategoryFilter" onchange="filterDevices(document.querySelector('#page-devices .search-input').value,'all')">
+          <select id="allCategoryFilter" onchange="filterDevices(document.querySelector('#page-devices .search-input').value,'all')" ontouchend="setTimeout(()=>filterDevices(document.querySelector('#page-devices .search-input').value,'all'),100)">
             <option value="">전체 종류</option>
           </select>
-          <select id="allStatusFilter" onchange="filterDeviceStatus(this.value,'all')">
+          <select id="allStatusFilter" onchange="filterDevices(document.querySelector('#page-devices .search-input').value,'all')" ontouchend="setTimeout(()=>filterDevices(document.querySelector('#page-devices .search-input').value,'all'),100)">
             <option value="">전체 상태</option>
             <option value="대여가능">대여 가능</option>
             <option value="대여중">대여 중</option>
@@ -325,13 +395,14 @@
             <thead><tr><th>기기ID</th><th>기기명</th><th>종류</th><th>제조사</th><th>모델명</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
             <tbody id="deviceTableAll"></tbody>
           </table></div>
+          <div class="mobile-cards" id="mobileDeviceTableAll"></div>
         </div>
       </div>
 
       <div class="page" id="page-notebooks">
         <div class="search-bar">
           <input class="search-input" type="text" placeholder="검색..." oninput="filterDevices(this.value,'노트북')" />
-          <select id="notebookStatusFilter" onchange="filterDeviceStatus(this.value,'노트북')">
+          <select id="notebookStatusFilter" onchange="filterDeviceStatus(this.value,'노트북')" oninput="filterDeviceStatus(this.value,'노트북')">
             <option value="">전체 상태</option>
             <option value="대여가능">대여가능</option>
             <option value="대여중">대여중</option>
@@ -345,13 +416,12 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
           <tbody id="deviceTableNotebook"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileDeviceTableNotebook"></div></div>
       </div>
 
       <div class="page" id="page-tablets">
         <div class="search-bar">
-          <input class="search-input" type="text" placeholder="검색..." oninput="filterDevices(this.value,'태블릿')" />
-          <select id="tabletStatusFilter" onchange="filterDeviceStatus(this.value,'태블릿')">
+          <select id="tabletStatusFilter" onchange="filterDeviceStatus(this.value,'태블릿')" oninput="filterDeviceStatus(this.value,'태블릿')">
             <option value="">전체 상태</option>
             <option value="대여가능">대여가능</option>
             <option value="대여중">대여중</option>
@@ -365,14 +435,14 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
           <tbody id="deviceTableTablet"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileDeviceTableTablet"></div></div>
       </div>
 
 
       <div class="page" id="page-tabletKo">
         <div class="search-bar">
           <input class="search-input" type="text" placeholder="검색..." oninput="filterDevicesCat(this.value,'타블렛')" />
-          <select id="tabletKoStatusFilter" onchange="filterDeviceStatus(this.value,'타블렛')">
+          <select id="tabletKoStatusFilter" onchange="filterDeviceStatus(this.value,'타블렛')" oninput="filterDeviceStatus(this.value,'타블렛')">
             <option value="">전체 상태</option>
             <option value="대여가능">대여가능</option>
             <option value="대여중">대여중</option>
@@ -386,13 +456,13 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
           <tbody id="deviceTableTabletKo"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileDeviceTableTabletKo"></div></div>
       </div>
 
       <div class="page" id="page-webcams">
         <div class="search-bar">
           <input class="search-input" type="text" placeholder="검색..." oninput="filterDevicesCat(this.value,'웹캠')" />
-          <select id="webcamStatusFilter" onchange="filterDeviceStatus(this.value,'웹캠')">
+          <select id="webcamStatusFilter" onchange="filterDeviceStatus(this.value,'웹캠')" oninput="filterDeviceStatus(this.value,'웹캠')">
             <option value="">전체 상태</option>
             <option value="대여가능">대여가능</option>
             <option value="대여중">대여중</option>
@@ -406,13 +476,13 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
           <tbody id="deviceTableWebcam"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileDeviceTableWebcam"></div></div>
       </div>
 
       <div class="page" id="page-monitors">
         <div class="search-bar">
           <input class="search-input" type="text" placeholder="검색..." oninput="filterDevicesCat(this.value,'포터블모니터')" />
-          <select id="monitorStatusFilter" onchange="filterDeviceStatus(this.value,'포터블모니터')">
+          <select id="monitorStatusFilter" onchange="filterDeviceStatus(this.value,'포터블모니터')" oninput="filterDeviceStatus(this.value,'포터블모니터')">
             <option value="">전체 상태</option>
             <option value="대여가능">대여가능</option>
             <option value="대여중">대여중</option>
@@ -426,12 +496,12 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
           <tbody id="deviceTableMonitor"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileDeviceTableMonitor"></div></div>
       </div>
       <div class="page" id="page-others">
         <div class="search-bar">
           <input class="search-input" type="text" placeholder="검색..." oninput="filterDevices(this.value,'기타전자기기')" />
-          <select id="otherStatusFilter" onchange="filterDeviceStatus(this.value,'기타기기')">
+          <select id="otherStatusFilter" onchange="filterDeviceStatus(this.value,'기타기기')" oninput="filterDeviceStatus(this.value,'기타기기')">
             <option value="">전체 상태</option>
             <option value="대여가능">대여가능</option>
             <option value="대여중">대여중</option>
@@ -445,7 +515,7 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>기기ID</th><th>기기명</th><th>제조사</th><th>모델명</th><th>라벨</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
           <tbody id="deviceTableOther"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileDeviceTableOther"></div></div>
       </div>
 
       <!-- 대여현황 -->
@@ -470,7 +540,9 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>대여번호</th><th>기기ID</th><th>대여자</th><th>대여일</th><th>반납예정일</th><th>상태</th><th>반납일</th><th>연체일수</th><th></th></tr></thead>
           <tbody id="loanTable"></tbody>
-        </table></div></div>
+        </table></div>
+        <div class="mobile-cards" id="mobileLoanTable"></div>
+        </div>
       </div>
 
       <!-- 연체현황 -->
@@ -478,7 +550,9 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>대여번호</th><th>기기</th><th>대여자</th><th>반납예정일</th><th>연체일수</th><th>연락처</th><th></th></tr></thead>
           <tbody id="overdueTable"></tbody>
-        </table></div></div>
+        </table></div>
+        <div class="mobile-cards" id="mobileOverdueTable"></div>
+        </div></div>
       </div>
 
       <!-- 학생 -->
@@ -490,7 +564,7 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th style="width:36px"><input type="checkbox" onchange="toggleSelectAll('student',this.checked)" id="stuCheckAll" /></th><th>학번</th><th>이름</th><th>학년/반</th><th>상태</th><th>현재대여</th><th></th></tr></thead>
           <tbody id="studentTable"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileStudentTable"></div></div>
       </div>
 
       <!-- 일괄 등록 -->
@@ -633,7 +707,7 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th style="width:36px"><input type="checkbox" onchange="toggleSelectAll('staff',this.checked)" id="stfCheckAll" /></th><th>이름</th><th>구분</th><th>현재대여</th><th></th></tr></thead>
           <tbody id="staffTable"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileStaffTable"></div></div>
       </div>
 
       <!-- 실습실·특별실 -->
@@ -656,7 +730,7 @@
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>공간명</th><th>종류</th><th>수용인원</th><th>상태</th><th>대여자</th><th>반납예정일</th><th></th></tr></thead>
           <tbody id="roomTable"></tbody>
-        </table></div></div>
+        </table></div><div class="mobile-cards" id="mobileRoomTable"></div></div>
       </div>
 
 
@@ -1187,6 +1261,15 @@ function canAdmin() {
   return currentUser && currentUser.role === '관리자';
 }
 
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarBackdrop').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarBackdrop').classList.remove('open');
+}
+
 function connectSupabase() {
   const url = document.getElementById('cfgUrl').value.trim();
   const key = document.getElementById('cfgKey').value.trim();
@@ -1264,6 +1347,7 @@ const pageTitles = {
 };
 
 function showPage(page) {
+  closeSidebar();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
@@ -1273,6 +1357,18 @@ function showPage(page) {
   localStorage.setItem('lastPage', page);
   document.getElementById('pageTitle').textContent = pageTitles[page] || page;
   currentPage = page;
+
+  // 모든 페이지 이동 시 전체기기 필터 초기화
+  const allStatusFilter = document.getElementById('allStatusFilter');
+  const allCategoryFilter = document.getElementById('allCategoryFilter');
+  if (allStatusFilter) allStatusFilter.value = '';
+  if (allCategoryFilter) allCategoryFilter.value = '';
+  // 카테고리 페이지 상태 필터도 초기화
+  const statusFilterIds = ['notebookStatusFilter','tabletStatusFilter','tabletKoStatusFilter','webcamStatusFilter','monitorStatusFilter','otherStatusFilter'];
+  statusFilterIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
 
   const addBtn = document.getElementById('topAddBtn');
   const lendBtn = document.getElementById('lendBtn');
@@ -1285,14 +1381,11 @@ function showPage(page) {
       addBtn.textContent = '+ 기기 추가';
     }
     if (page === 'devices') {
-      setTimeout(() => {
-        const catSel = document.getElementById('allCategoryFilter');
-        if (catSel && allDevices.length) {
-          const current = catSel.value;
-          const cats = [...new Set(allDevices.map(d=>d.category).filter(Boolean))].sort();
-          catSel.innerHTML = '<option value="">전체 종류</option>' + cats.map(c=>`<option value="${c}" ${current===c?'selected':''}>${c}</option>`).join('');
-        }
-      }, 50);
+      const catSel = document.getElementById('allCategoryFilter');
+      if (catSel && allDevices.length) {
+        const cats = [...new Set(allDevices.map(d=>d.category).filter(Boolean))].sort();
+        catSel.innerHTML = '<option value="">전체 종류</option>' + cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+      }
     }
   }
   if (page === 'students') { if (canEdit()) { addBtn.style.display = ''; addBtn.textContent = '+ 학생 추가'; } }
@@ -1300,6 +1393,8 @@ function showPage(page) {
   if (page === 'rooms') { if (canEdit()) { addBtn.style.display = ''; addBtn.textContent = '+ 공간 추가'; } }
   if (page === 'loans') { if (canEdit()) { lendBtn.style.display = ''; } setTimeout(() => { try { populateLoanCategoryFilter(); } catch(e){} }, 50); }
 
+  // 모든 모바일 카드 먼저 초기화
+  document.querySelectorAll('.mobile-cards').forEach(el => el.innerHTML = '');
   renderPage(page);
 }
 
@@ -1435,7 +1530,14 @@ function renderDashboard() {
 
 function renderDeviceTable(devices, tbodyId, showCategory) {
   const tbody = document.getElementById(tbodyId);
-  if (!devices.length) { tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-icon">💻</div><p>등록된 기기가 없어요</p></div></td></tr>`; return; }
+  const mobileId = 'mobile' + tbodyId.charAt(0).toUpperCase() + tbodyId.slice(1);
+  const mobileEl = document.getElementById(mobileId);
+
+  if (!devices.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-icon">💻</div><p>등록된 기기가 없어요</p></div></td></tr>`;
+    if (mobileEl) mobileEl.innerHTML = `<div class="empty" style="padding:40px 20px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:10px">💻</div><p>등록된 기기가 없어요</p></div>`;
+    return;
+  }
   tbody.innerHTML = devices.map(d => {
     const loan = getActiveLoan(d.id);
     const borrower = loan ? (loan.borrower_name || '-') : '-';
@@ -1465,11 +1567,48 @@ function renderDeviceTable(devices, tbodyId, showCategory) {
       </td>
     </tr>`;
   }).join('');
+
+  // 모바일 카드 렌더링
+  if (!mobileEl) return;
+  mobileEl.innerHTML = `<div class="mobile-card-list">${devices.map(d => {
+    const loan = getActiveLoan(d.id);
+    const borrower = loan ? (loan.borrower_name || '-') : '-';
+    const borrowerId = loan?.borrower_id || '';
+    const dueDate = loan ? (loan.due_date || '-') : '-';
+    const canDelete = !['대여중','연체'].includes(d.status);
+    return `<div class="mobile-card">
+      <div class="mobile-card-header">
+        <div>
+          <div class="mobile-card-title">${d.name}</div>
+          <div class="mobile-card-sub">${d.id}${d.label ? ' · ' + d.label : ''}</div>
+        </div>
+        ${statusBadge(d.status)}
+      </div>
+      <div class="mobile-card-cols">
+        ${showCategory ? `<div><div class="mobile-card-label">종류</div><div class="mobile-card-value">${d.category||'-'}</div></div>` : ''}
+        <div><div class="mobile-card-label">제조사</div><div class="mobile-card-value">${d.maker||'-'}</div></div>
+        <div><div class="mobile-card-label">모델명</div><div class="mobile-card-value">${d.model||'-'}</div></div>
+        <div><div class="mobile-card-label">대여자</div><div class="mobile-card-value">${borrower}${borrowerId && borrowerId !== borrower ? `<br><span style="font-size:11px;color:var(--text-muted);font-weight:400">${borrowerId}</span>` : ''}</div></div>
+        <div><div class="mobile-card-label">반납예정일</div><div class="mobile-card-value">${dueDate}</div></div>
+      </div>
+      ${canEdit() ? `<div class="mobile-card-actions">
+        ${d.status==='대여가능' ? `<button class="btn btn-primary btn-sm" onclick="quickLend('${d.id}')">대여</button>` : ''}
+        ${['대여중','연체'].includes(d.status) ? `<button class="btn btn-success btn-sm" data-lid="${loan?.id||''}" data-did="${d.id}" data-name="${d.name}" data-borrower="${borrower}" onclick="openReturnByDevice(this)">반납</button>` : ''}
+        <button class="btn btn-outline btn-sm" data-id="${d.id}" onclick="openEditDevice(this.dataset.id)">수정</button>
+        ${canDelete ? `<button class="btn btn-danger btn-sm" data-id="${d.id}" onclick="deleteDevice(this.dataset.id)">삭제</button>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderLoanTable(loans, tbodyId) {
   const tbody = document.getElementById(tbodyId);
-  if (!loans.length) { tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><p>대여 내역 없음</p></div></td></tr>`; return; }
+  const mobileEl = document.getElementById('mobileLoanTable');
+  if (!loans.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><p>대여 내역 없음</p></div></td></tr>`;
+    if (mobileEl) mobileEl.innerHTML = `<div class="empty" style="padding:40px 20px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:10px">📋</div><p>대여 내역 없음</p></div>`;
+    return;
+  }
   tbody.innerHTML = loans.map(l => {
     const days = l.status==='연체' ? calcOverdueDays(l.due_date, l.return_date) : 0;
     const isStudent = allStudents.some(s => s.id === l.borrower_id);
@@ -1492,11 +1631,45 @@ function renderLoanTable(loans, tbodyId) {
       </td>
     </tr>`;
   }).join('');
+
+  // 모바일 카드
+  if (!mobileEl) return;
+  mobileEl.innerHTML = `<div class="mobile-card-list" style="padding:12px">${loans.map(l => {
+    const days = l.status==='연체' ? calcOverdueDays(l.due_date, l.return_date) : 0;
+    const isStudent = allStudents.some(s => s.id === l.borrower_id);
+    const dev = allDevices.find(d => d.id === l.device_id);
+    return `<div class="mobile-card">
+      <div class="mobile-card-header">
+        <div>
+          <div class="mobile-card-title">${dev?.name || l.device_id}</div>
+          <div class="mobile-card-sub">${l.id} · ${l.device_id}</div>
+        </div>
+        ${statusBadge(l.status)}
+      </div>
+      <div class="mobile-card-cols">
+        <div><div class="mobile-card-label">대여자</div><div class="mobile-card-value">${l.borrower_name||'-'}${isStudent && l.borrower_id && l.borrower_id !== l.borrower_name ? `<br><span style="font-size:11px;color:var(--text-muted);font-weight:400">${l.borrower_id}</span>` : ''}</div></div>
+        <div><div class="mobile-card-label">대여일</div><div class="mobile-card-value">${l.loan_date||'-'}</div></div>
+        <div><div class="mobile-card-label">반납예정일</div><div class="mobile-card-value">${l.due_date||'-'}</div></div>
+        <div><div class="mobile-card-label">반납일</div><div class="mobile-card-value">${l.return_date||'-'}</div></div>
+        ${days>0 ? `<div><div class="mobile-card-label">연체일수</div><div class="mobile-card-value" style="color:var(--red);font-weight:700">${days}일</div></div>` : ''}
+      </div>
+      ${canEdit() ? `<div class="mobile-card-actions">
+        ${l.status!=='반납완료' ? `<button class="btn btn-success btn-sm" onclick="openReturnModal('${l.id}','${l.borrower_name}','${l.device_id}')">반납</button>` : ''}
+        <button class="btn btn-outline btn-sm" data-id="${l.id}" onclick="openEditLoan(this.dataset.id)">수정</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLoan('${l.id}','${l.device_id}','${l.status}')">삭제</button>
+      </div>` : ''}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderOverdueTable(loans, tbodyId) {
   const tbody = document.getElementById(tbodyId);
-  if (!loans.length) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">✅</div><p>연체 없음</p></div></td></tr>`; return; }
+  const mobileEl = document.getElementById('mobileOverdueTable');
+  if (!loans.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">✅</div><p>연체 없음</p></div></td></tr>`;
+    if (mobileEl) mobileEl.innerHTML = `<div class="empty" style="padding:40px 20px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:10px">✅</div><p>연체 없음</p></div>`;
+    return;
+  }
   tbody.innerHTML = loans.map(l => {
     const dev = allDevices.find(d=>d.id===l.device_id);
     const stu = allStudents.find(s=>s.id===l.borrower_id);
@@ -1513,11 +1686,38 @@ function renderOverdueTable(loans, tbodyId) {
       <td>${canEdit() ? `<button class="btn btn-success btn-sm" onclick="openReturnModal('${l.id}','${l.borrower_name}','${dev?.name||l.device_id}')">반납</button>` : '-'}</td>
     </tr>`;
   }).join('');
+
+  if (!mobileEl) return;
+  mobileEl.innerHTML = `<div class="mobile-card-list" style="padding:12px">${loans.map(l => {
+    const dev = allDevices.find(d=>d.id===l.device_id);
+    const days = calcOverdueDays(l.due_date);
+    return `<div class="mobile-card">
+      <div class="mobile-card-header">
+        <div>
+          <div class="mobile-card-title">${dev?.name||l.device_id}</div>
+          <div class="mobile-card-sub">${l.borrower_name}</div>
+        </div>
+        <span style="color:var(--red);font-weight:700;font-size:15px">${days}일 연체</span>
+      </div>
+      <div class="mobile-card-cols">
+        <div><div class="mobile-card-label">반납예정일</div><div class="mobile-card-value" style="color:var(--red)">${l.due_date||'-'}</div></div>
+        <div><div class="mobile-card-label">연락처</div><div class="mobile-card-value">${allStudents.find(s=>s.id===l.borrower_id)?.phone || allStaff.find(s=>s.id===l.borrower_id)?.phone || '-'}</div></div>
+      </div>
+      ${canEdit() ? `<div class="mobile-card-actions">
+        <button class="btn btn-success btn-sm" onclick="openReturnModal('${l.id}','${l.borrower_name}','${dev?.name||l.device_id}')">반납</button>
+      </div>` : ''}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderStudentTable(students, tbodyId) {
   const tbody = document.getElementById(tbodyId);
-  if (!students.length) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><p>등록된 학생 없음</p></div></td></tr>`; return; }
+  const mobileEl = document.getElementById('mobileStudentTable');
+  if (!students.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><p>등록된 학생 없음</p></div></td></tr>`;
+    if (mobileEl) mobileEl.innerHTML = `<div class="empty" style="padding:40px 20px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:10px">👤</div><p>등록된 학생 없음</p></div>`;
+    return;
+  }
   tbody.innerHTML = students.map(s => {
     const activeLoanCount = allLoans.filter(l=>l.borrower_id===s.id && ['대여중','연체'].includes(l.status)).length;
     const statusBadgeClass = s.status==='재학' ? 'available' : s.status==='졸업' ? 'returned' : 'repair';
@@ -1531,11 +1731,34 @@ function renderStudentTable(students, tbodyId) {
       <td style="white-space:nowrap;display:flex;gap:4px">${canEdit() ? `<button class="btn btn-outline btn-sm" data-id="${s.id}" onclick="openEditStudent(this.dataset.id)">수정</button><button class="btn btn-danger btn-sm" data-id="${s.id}" onclick="deleteStudent(this.dataset.id)">삭제</button>` : '-'}</td>
     </tr>`;
   }).join('');
+  if (!mobileEl) return;
+  mobileEl.innerHTML = `<div class="mobile-card-list" style="padding:12px">${students.map(s => {
+    const activeLoanCount = allLoans.filter(l=>l.borrower_id===s.id && ['대여중','연체'].includes(l.status)).length;
+    const statusBadgeClass = s.status==='재학' ? 'available' : s.status==='졸업' ? 'returned' : 'repair';
+    return `<div class="mobile-card">
+      <div class="mobile-card-header">
+        <div>
+          <div class="mobile-card-title">${s.name||'-'}</div>
+          <div class="mobile-card-sub">${s.id} · ${s.class_info||'-'}</div>
+        </div>
+        <span class="badge badge-${statusBadgeClass}">${s.status||'재학'}</span>
+      </div>
+      <div class="mobile-card-actions">
+        ${activeLoanCount>0?`<button class="btn btn-sm" style="background:var(--lt-blue);color:var(--blue);border:none;font-weight:600" onclick="filterLoansByBorrower('${s.id}','${s.name}')">${activeLoanCount}건 대여중</button>`:''}
+        ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="openEditStudent('${s.id}')">수정</button><button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}')">삭제</button>`:''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderStaffTable(staff, tbodyId) {
   const tbody = document.getElementById(tbodyId);
-  if (!staff.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><p>등록된 교직원 없음</p></div></td></tr>`; return; }
+  const mobileEl = document.getElementById('mobileStaffTable');
+  if (!staff.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><p>등록된 교직원 없음</p></div></td></tr>`;
+    if (mobileEl) mobileEl.innerHTML = `<div class="empty" style="padding:40px 20px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:10px">👩‍🏫</div><p>등록된 교직원 없음</p></div>`;
+    return;
+  }
   tbody.innerHTML = staff.map(s => {
     const activeLoanCount = allLoans.filter(l=>l.borrower_id===s.id && ['대여중','연체'].includes(l.status)).length;
     return `<tr>
@@ -1546,6 +1769,20 @@ function renderStaffTable(staff, tbodyId) {
       <td style="white-space:nowrap;display:flex;gap:4px">${canEdit() ? `<button class="btn btn-outline btn-sm" data-id="${s.id}" onclick="openEditStaff(this.dataset.id)">수정</button><button class="btn btn-danger btn-sm" data-id="${s.id}" onclick="deleteStaff(this.dataset.id)">삭제</button>` : '-'}</td>
     </tr>`;
   }).join('');
+  if (!mobileEl) return;
+  mobileEl.innerHTML = `<div class="mobile-card-list" style="padding:12px">${staff.map(s => {
+    const activeLoanCount = allLoans.filter(l=>l.borrower_id===s.id && ['대여중','연체'].includes(l.status)).length;
+    return `<div class="mobile-card">
+      <div class="mobile-card-header">
+        <div><div class="mobile-card-title">${s.name||s.id}</div></div>
+        <span class="badge" style="background:var(--lt-blue);color:var(--blue)">${s.role||'교직원'}</span>
+      </div>
+      <div class="mobile-card-actions">
+        ${activeLoanCount>0?`<button class="btn btn-sm" style="background:var(--lt-blue);color:var(--blue);border:none;font-weight:600" onclick="filterLoansByBorrower('${s.id}','${s.name}')">${activeLoanCount}건 대여중</button>`:''}
+        ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="openEditStaff('${s.id}')">수정</button><button class="btn btn-danger btn-sm" onclick="deleteStaff('${s.id}')">삭제</button>`:''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 // ── Filters ───────────────────────────────────────────────────
@@ -1581,24 +1818,42 @@ function getStatusFilterId(category) {
 }
 
 function filterDevices(q, category) {
-  const filterMap = { '노트북':'notebookPrefixFilter', '태블릿':'tabletPrefixFilter', '기타전자기기':'otherPrefixFilter' };
+  const allCatFilter = document.getElementById('allCategoryFilter')?.value || '';
+  const allStatusFilter = document.getElementById('allStatusFilter')?.value || '';
+
+  const filterMap = {
+    '노트북':'notebookPrefixFilter', '태블릿':'tabletPrefixFilter',
+    '타블렛':'tabletKoPrefixFilter', '웹캠':'webcamPrefixFilter',
+    '포터블모니터':'monitorPrefixFilter', '기타기기':'otherPrefixFilter',
+    '기타전자기기':'otherPrefixFilter'
+  };
   const selId = filterMap[category];
   const prefix = selId ? (document.getElementById(selId)?.value || '') : '';
   const statusId = getStatusFilterId(category);
   const status = statusId ? (document.getElementById(statusId)?.value || '') : '';
 
-  const allCatFilter = document.getElementById('allCategoryFilter')?.value || '';
-  const allStatusFilter = document.getElementById('allStatusFilter')?.value || '';
   const filtered = allDevices.filter(d => {
-    const matchCat = !category || category==='all' || d.category===category;
-    const matchAllCat = !allCatFilter || category!=='all' || d.category===allCatFilter;
-    const matchQ = !q || [d.id,d.name,d.maker,d.model,d.label].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()));
-    const matchPrefix = !prefix || getDevicePrefix(d.id) === prefix;
-    const matchStatus = !status || d.status === status;
-    const matchAllStatus = !allStatusFilter || category!=='all' || d.status===allStatusFilter;
-    return matchCat && matchAllCat && matchQ && matchPrefix && matchStatus && matchAllStatus;
+    if (category === 'all') {
+      // 전체 기기 탭: allCategoryFilter + allStatusFilter 사용
+      const matchCat = !allCatFilter || d.category === allCatFilter;
+      const matchStatus = !allStatusFilter || d.status === allStatusFilter;
+      const matchQ = !q || [d.id,d.name,d.maker,d.model,d.label].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()));
+      return matchCat && matchStatus && matchQ;
+    } else {
+      // 개별 카테고리 탭
+      const matchCat = d.category === category;
+      const matchPrefix = !prefix || getDevicePrefix(d.id) === prefix;
+      const matchStatus = !status || d.status === status;
+      const matchQ = !q || [d.id,d.name,d.maker,d.model,d.label].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()));
+      return matchCat && matchPrefix && matchStatus && matchQ;
+    }
   });
-  const tableMap = { all:'deviceTableAll', '노트북':'deviceTableNotebook', '태블릿':'deviceTableTablet', '기타전자기기':'deviceTableOther' };
+
+  const tableMap = {
+    all:'deviceTableAll', '노트북':'deviceTableNotebook', '태블릿':'deviceTableTablet',
+    '타블렛':'deviceTableTabletKo', '웹캠':'deviceTableWebcam',
+    '포터블모니터':'deviceTableMonitor', '기타기기':'deviceTableOther', '기타전자기기':'deviceTableOther'
+  };
   renderDeviceTable(filtered, tableMap[category]||'deviceTableAll', category==='all');
 }
 
@@ -2075,16 +2330,21 @@ function renderPageWithFilter(page, cat, selId, tableId) {
   const savedPrefix = localStorage.getItem('filter_' + page);
   const sel = document.getElementById(selId);
   if (savedPrefix && sel) {
-    // 옵션에 해당 값이 있으면 선택
     const opt = [...sel.options].find(o => o.value === savedPrefix);
     if (opt) sel.value = savedPrefix;
     else sel.value = '';
   }
   const prefix = sel?.value || '';
+
+  // 상태 필터 읽기
+  const statusSelId = getStatusFilterId(cat);
+  const status = statusSelId ? (document.getElementById(statusSelId)?.value || '') : '';
+
   const filtered = allDevices.filter(d => {
     const matchCat = d.category === cat;
     const matchPrefix = !prefix || getDevicePrefix(d.id) === prefix;
-    return matchCat && matchPrefix;
+    const matchStatus = !status || d.status === status;
+    return matchCat && matchPrefix && matchStatus;
   });
   renderDeviceTable(filtered, tableId, false);
 }
@@ -2850,9 +3110,12 @@ async function loadRooms() {
 
 function renderRoomTable(rooms, tbodyId) {
   const tbody = document.getElementById(tbodyId);
-  if (!rooms.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">🏫</div><p>등록된 공간이 없어요</p></div></td></tr>`; return; }
-
-  // 실습실 → 도서관 → 기타특별실 순 정렬, 같은 종류 안에서는 이름 순
+  const mobileEl = document.getElementById('mobileRoomTable');
+  if (!rooms.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">🏫</div><p>등록된 공간이 없어요</p></div></td></tr>`;
+    if (mobileEl) mobileEl.innerHTML = `<div class="empty" style="padding:40px 20px;text-align:center;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:10px">🏫</div><p>등록된 공간이 없어요</p></div>`;
+    return;
+  }
   const categoryOrder = { '실습실': 0, '기타특별실': 1, '도서관': 2 };
   const sorted = [...rooms].sort((a, b) => {
     const oa = categoryOrder[a.category] ?? 99;
@@ -2880,6 +3143,31 @@ function renderRoomTable(rooms, tbodyId) {
       </td>
     </tr>`;
   }).join('');
+  if (!mobileEl) return;
+  mobileEl.innerHTML = `<div class="mobile-card-list" style="padding:12px">${sorted.map(r => {
+    const loan = allLoans.find(l => l.device_id === r.id && ['대여중','연체'].includes(l.status));
+    const borrower = loan ? (loan.borrower_name || '-') : '-';
+    const catColor = r.category==='실습실' ? 'lent' : r.category==='도서관' ? 'available' : 'repair';
+    return `<div class="mobile-card">
+      <div class="mobile-card-header">
+        <div>
+          <div class="mobile-card-title">${r.name}</div>
+          <div class="mobile-card-sub">${r.category||'-'}${r.capacity ? ' · '+r.capacity+'명' : ''}</div>
+        </div>
+        ${statusBadge(r.status||'사용가능')}
+      </div>
+      ${loan ? `<div class="mobile-card-cols">
+        <div><div class="mobile-card-label">대여자</div><div class="mobile-card-value">${borrower}</div></div>
+        <div><div class="mobile-card-label">반납예정일</div><div class="mobile-card-value">${loan.due_date||'-'}</div></div>
+      </div>` : ''}
+      <div class="mobile-card-actions">
+        ${(r.status||'사용가능')==='사용가능' && canEdit() ? `<button class="btn btn-primary btn-sm" onclick="quickLendRoom('${r.id}')">대여</button>` : ''}
+        ${r.status==='사용중' && canEdit() ? `<button class="btn btn-success btn-sm" data-lid="${loan?.id||''}" data-did="${r.id}" data-name="${r.name}" data-borrower="${borrower}" onclick="openReturnByDevice(this)">반납</button>` : ''}
+        ${canEdit() ? `<button class="btn btn-outline btn-sm" onclick="openEditRoom('${r.id}')">수정</button>` : ''}
+        ${canEdit() ? `<button class="btn btn-danger btn-sm" onclick="deleteRoom('${r.id}')">삭제</button>` : ''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function filterRooms(q) {
