@@ -260,11 +260,11 @@
         <!-- 기기 현황 -->
         <div class="kpi-grid" id="kpiGrid" style="grid-template-columns:repeat(6,1fr);margin-bottom:12px">
           <div class="kpi" onclick="showPage('devices')" style="cursor:pointer" title="전체 기기로 이동"><div class="kpi-label">전체 기기</div><div class="kpi-value" id="kpi-total">-</div></div>
-          <div class="kpi" onclick="showPage('devices');setTimeout(()=>filterDeviceStatus('대여가능','all'),100)" style="cursor:pointer" title="대여가능 기기 보기"><div class="kpi-label">대여 가능</div><div class="kpi-value" style="color:var(--green)" id="kpi-available">-</div></div>
+          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='대여가능';filterDeviceStatus('대여가능','all');},100)" style="cursor:pointer" title="대여가능 기기 보기"><div class="kpi-label">대여 가능</div><div class="kpi-value" style="color:var(--green)" id="kpi-available">-</div></div>
           <div class="kpi" onclick="showPage('loans');setTimeout(()=>{document.getElementById('loanStatusFilter').value='대여중';filterLoans('');},100)" style="cursor:pointer" title="대여현황으로 이동"><div class="kpi-label">대여 중</div><div class="kpi-value" style="color:var(--blue)" id="kpi-lent">-</div></div>
           <div class="kpi" onclick="showPage('overdue')" style="cursor:pointer" title="연체현황으로 이동"><div class="kpi-label">연체</div><div class="kpi-value" style="color:var(--red)" id="kpi-overdue">-</div></div>
-          <div class="kpi" onclick="showPage('devices');setTimeout(()=>filterDeviceStatus('수리중','all'),100)" style="cursor:pointer" title="수리중 기기 보기"><div class="kpi-label">수리중</div><div class="kpi-value" style="color:var(--amber)" id="kpi-repair">-</div></div>
-          <div class="kpi" onclick="showPage('devices');setTimeout(()=>filterDeviceStatus('분실','all'),100)" style="cursor:pointer" title="분실 기기 보기"><div class="kpi-label">분실</div><div class="kpi-value" style="color:var(--red)" id="kpi-lost">-</div></div>
+          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='수리중';filterDeviceStatus('수리중','all');},100)" style="cursor:pointer" title="수리중 기기 보기"><div class="kpi-label">수리중</div><div class="kpi-value" style="color:var(--amber)" id="kpi-repair">-</div></div>
+          <div class="kpi" onclick="showPage('devices');setTimeout(()=>{document.getElementById('allStatusFilter').value='분실';filterDeviceStatus('분실','all');},100)" style="cursor:pointer" title="분실 기기 보기"><div class="kpi-label">분실</div><div class="kpi-value" style="color:var(--red)" id="kpi-lost">-</div></div>
         </div>
         <!-- 인원 현황 -->
         <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:20px">
@@ -1441,7 +1441,7 @@ function renderDeviceTable(devices, tbodyId, showCategory) {
     const borrower = loan ? (loan.borrower_name || '-') : '-';
     const borrowerId = loan?.borrower_id || '';
     const borrowerDisplay = loan
-      ? `${loan.borrower_name||'-'}${borrowerId && borrowerId !== loan.borrower_name ? `<br><span style="font-size:11px;color:var(--text-muted);font-family:monospace">${borrowerId}</span>` : ''}`
+      ? `${loan.borrower_name||'-'}${borrowerId && borrowerId !== loan.borrower_name ? `<br><span style="font-size:11px;color:var(--text-muted);font-weight:400">${borrowerId}</span>` : ''}`
       : '-';
     const dueDate = loan ? (loan.due_date || '-') : '-';
     const categoryCol = showCategory ? `<td>${d.category||'-'}</td>` : '';
@@ -1472,10 +1472,14 @@ function renderLoanTable(loans, tbodyId) {
   if (!loans.length) { tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><p>대여 내역 없음</p></div></td></tr>`; return; }
   tbody.innerHTML = loans.map(l => {
     const days = l.status==='연체' ? calcOverdueDays(l.due_date, l.return_date) : 0;
+    const isStudent = allStudents.some(s => s.id === l.borrower_id);
+    const borrowerDisplay = l.borrower_name
+      ? `${l.borrower_name}${isStudent && l.borrower_id && l.borrower_id !== l.borrower_name ? `<br><span style="font-size:11px;color:var(--text-muted);font-weight:400">${l.borrower_id}</span>` : ''}`
+      : '-';
     return `<tr>
       <td style="font-size:12px">${l.id}</td>
       <td style="font-family:monospace;font-size:12px">${l.device_id}</td>
-      <td style="font-weight:600">${l.borrower_name}</td>
+      <td style="font-weight:600">${borrowerDisplay}</td>
       <td>${l.loan_date||'-'}</td>
       <td>${l.due_date||'-'}</td>
       <td>${statusBadge(l.status)}</td>
