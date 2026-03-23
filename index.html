@@ -209,7 +209,7 @@
   <div class="sidebar">
     <div class="sidebar-logo">
       <h1 style="white-space:nowrap;font-size:13px">🖥️ 기기 대여 관리 시스템</h1>
-      <p>학교 기기 대여 플랫폼</p>
+      <p>미림 기기 대여 플랫폼</p>
     </div>
     <nav class="nav">
       <div class="nav-section">메인</div>
@@ -640,7 +640,13 @@
       <div class="page" id="page-rooms">
         <div class="search-bar">
           <input class="search-input" type="text" placeholder="공간명 검색..." oninput="filterRooms(this.value)" />
-          <select onchange="filterRoomStatus(this.value)">
+          <select id="roomCategoryFilter" onchange="filterRooms(document.querySelector('#page-rooms .search-input').value)">
+            <option value="">전체 종류</option>
+            <option value="실습실">실습실</option>
+            <option value="도서관">도서관</option>
+            <option value="기타특별실">기타특별실</option>
+          </select>
+          <select id="roomStatusFilter" onchange="filterRooms(document.querySelector('#page-rooms .search-input').value)">
             <option value="">전체 상태</option>
             <option value="사용가능">사용 가능</option>
             <option value="사용중">사용 중</option>
@@ -2841,7 +2847,16 @@ async function loadRooms() {
 function renderRoomTable(rooms, tbodyId) {
   const tbody = document.getElementById(tbodyId);
   if (!rooms.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">🏫</div><p>등록된 공간이 없어요</p></div></td></tr>`; return; }
-  tbody.innerHTML = rooms.map(r => {
+
+  // 실습실 → 도서관 → 기타특별실 순 정렬, 같은 종류 안에서는 이름 순
+  const categoryOrder = { '실습실': 0, '기타특별실': 1, '도서관': 2 };
+  const sorted = [...rooms].sort((a, b) => {
+    const oa = categoryOrder[a.category] ?? 99;
+    const ob = categoryOrder[b.category] ?? 99;
+    if (oa !== ob) return oa - ob;
+    return (a.name || '').localeCompare(b.name || '', 'ko');
+  });
+  tbody.innerHTML = sorted.map(r => {
     const loan = allLoans.find(l => l.device_id === r.id && ['대여중','연체'].includes(l.status));
     const borrower = loan ? (loan.borrower_name || '-') : '-';
     const dueDate = loan ? (loan.due_date || '-') : '-';
@@ -2864,13 +2879,19 @@ function renderRoomTable(rooms, tbodyId) {
 }
 
 function filterRooms(q) {
-  const filtered = allRooms.filter(r => !q || [r.id,r.name,r.category].some(v=>(v||'').toLowerCase().includes(q.toLowerCase())));
+  const category = document.getElementById('roomCategoryFilter')?.value || '';
+  const status = document.getElementById('roomStatusFilter')?.value || '';
+  const filtered = allRooms.filter(r => {
+    const matchQ = !q || [r.id, r.name, r.category].some(v => (v||'').toLowerCase().includes(q.toLowerCase()));
+    const matchCat = !category || r.category === category;
+    const matchStatus = !status || r.status === status;
+    return matchQ && matchCat && matchStatus;
+  });
   renderRoomTable(filtered, 'roomTable');
 }
 
 function filterRoomStatus(status) {
-  const filtered = allRooms.filter(r => !status || r.status === status);
-  renderRoomTable(filtered, 'roomTable');
+  filterRooms(document.querySelector('#page-rooms .search-input')?.value || '');
 }
 
 function openRoomModal() {
