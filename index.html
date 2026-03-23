@@ -536,6 +536,7 @@
             <option value="연체">연체</option>
             <option value="반납완료">반납 완료</option>
           </select>
+          <button class="btn btn-outline" onclick="openNoticeModal()" style="white-space:nowrap">📢 반납 공지 생성</button>
         </div>
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>대여번호</th><th>기기ID</th><th>대여자</th><th>대여일</th><th>반납예정일</th><th>상태</th><th>반납일</th><th>연체일수</th><th></th></tr></thead>
@@ -1160,6 +1161,22 @@
   </div>
 </div>
 
+<!-- 반납 공지 생성 모달 -->
+<div class="modal-overlay" id="noticeModal">
+  <div class="modal" style="width:600px">
+    <div class="modal-header">
+      <div class="modal-title">📢 반납 공지 생성 (D-10일 이내)</div>
+      <button class="modal-close" onclick="closeModal('noticeModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="noticeContent"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('noticeModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1261,7 +1278,80 @@ function canAdmin() {
   return currentUser && currentUser.role === '관리자';
 }
 
-function openSidebar() {
+function openNoticeModal() {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const d10 = new Date(today);
+  d10.setDate(d10.getDate() + 10);
+
+  // 대여중/연체 중 반납예정일이 오늘~D+10인 학생 대여만 필터
+  const target = allLoans.filter(l => {
+    if (!['대여중','연체'].includes(l.status)) return false;
+    if (!l.due_date) return false;
+    const due = new Date(l.due_date);
+    due.setHours(0,0,0,0);
+    return due >= today && due <= d10;
+  }).filter(l => allStudents.some(s => s.id === l.borrower_id));
+
+  // 반별로 묶기
+  const byClass = {};
+  target.forEach(l => {
+    const stu = allStudents.find(s => s.id === l.borrower_id);
+    const cls = stu?.class_info || '미분류';
+    if (!byClass[cls]) byClass[cls] = [];
+    byClass[cls].push({ loan: l, stu });
+  });
+
+  const container = document.getElementById('noticeContent');
+
+  if (Object.keys(byClass).length === 0) {
+    container.innerHTML = `<div class="empty" style="padding:30px;text-align:center;color:var(--text-muted)"><div style="font-size:32px;margin-bottom:8px">✅</div><p>D-10일 이내 반납 예정 학생이 없어요</p></div>`;
+    document.getElementById('noticeModal').classList.add('open');
+    return;
+  }
+
+  // 반 이름 정렬
+  const sortedClasses = Object.keys(byClass).sort((a, b) => a.localeCompare(b, 'ko'));
+
+  container.innerHTML = sortedClasses.map(cls => {
+    const items = byClass[cls];
+    const lines = items.map(({ loan, stu }) => {
+      const dev = allDevices.find(d => d.id === loan.device_id);
+      const devName = dev?.name || loan.device_id;
+      const dday = Math.ceil((new Date(loan.due_date) - today) / 86400000);
+      const ddayStr = dday === 0 ? '오늘 반납' : `D-${dday}`;
+      return `• ${stu?.name || loan.borrower_name} - ${devName} (${loan.due_date}, ${ddayStr})`;
+    }).join('\n');
+
+    const fullText = `[${cls} 담임선생님]\n안녕하세요! 기기 반납 안내드립니다 🙏\n아래 학생들의 기기 반납을 부탁드립니다.\n\n${lines}`;
+
+    const safeId = cls.replace(/\s/g,'_');
+    return `<div style="margin-bottom:16px;padding:16px;background:var(--gray);border-radius:10px;border:1px solid var(--mid-gray)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy)">${cls} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(${items.length}건)</span></div>
+        <button class="btn btn-primary btn-sm" onclick="copyNotice('notice_${safeId}')">📋 복사</button>
+      </div>
+      <textarea id="notice_${safeId}" readonly style="width:100%;height:120px;font-size:13px;font-family:inherit;border:1px solid var(--mid-gray);border-radius:8px;padding:10px;background:white;resize:none;line-height:1.6">${fullText}</textarea>
+    </div>`;
+  }).join('');
+
+  document.getElementById('noticeModal').classList.add('open');
+}
+
+function copyNotice(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.select();
+  el.setSelectionRange(0, 99999);
+  try {
+    document.execCommand('copy');
+    showToast('클립보드에 복사됐어요! ✅', 'success');
+  } catch {
+    navigator.clipboard?.writeText(el.value).then(() => {
+      showToast('클립보드에 복사됐어요! ✅', 'success');
+    });
+  }
+}
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sidebarBackdrop').classList.add('open');
 }
