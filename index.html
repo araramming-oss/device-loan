@@ -2049,12 +2049,17 @@ function filterStaff(q) {
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
 
-function openLoanModal() {
+async function openLoanModal() {
   ['loanDeviceSearch','loanBorrowerSearch','loanBorrowerName','loanNote'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   ['loanDeviceId','loanBorrowerId'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   ['loanDeviceSelected','loanBorrowerSelected','loanDeviceDropdown','loanBorrowerDropdown'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
-  const lastNum = allLoans.length ? Math.max(...allLoans.map(l=>parseInt(l.id.replace(/\D/g,'')||'0'))) : 0;
+
+  // DB에서 직접 최신 대여번호 조회
+  const { data } = await sb.from('loans').select('id').order('id', { ascending: false }).limit(1);
+  const lastId = data?.[0]?.id || '';
+  const lastNum = lastId ? (parseInt(lastId.replace(/\D/g,'')) || 0) : 0;
   document.getElementById('loanId').value = 'LN-' + String(lastNum+1).padStart(3,'0');
+
   const today = new Date().toISOString().split('T')[0];
   const due = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
   document.getElementById('loanDate').value = today;
@@ -3067,7 +3072,9 @@ async function saveQuickLoan() {
   const borrowerName = document.getElementById('quickBorrowerName').value;
   const dueDate = document.getElementById('quickDueDate').value;
   if (!quickLoanDeviceId||!borrowerId||!dueDate) { showToast('기기·대여자·반납예정일을 모두 선택해주세요', 'error'); return; }
-  const lastId = allLoans.length ? parseInt(allLoans.map(l=>l.id.replace('LN-','')).sort().pop())||0 : 0;
+  const { data } = await sb.from('loans').select('id').order('id', { ascending: false }).limit(1);
+  const lastIdStr = data?.[0]?.id || '';
+  const lastId = lastIdStr ? (parseInt(lastIdStr.replace(/\D/g,'')) || 0) : 0;
   const id = 'LN-' + String(lastId+1).padStart(3,'0');
   const loanDate = new Date().toISOString().split('T')[0];
   const { error } = await sb.from('loans').insert([{ id, device_id:quickLoanDeviceId, borrower_id:borrowerId, borrower_name:borrowerName, loan_date:loanDate, due_date:dueDate, status:'대여중' }]);
