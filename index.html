@@ -902,6 +902,7 @@
         <div class="form-group"><label>상태</label><select id="devStatus"><option value="대여가능">대여가능</option><option value="수리중">수리중</option><option value="분실">분실</option></select></div>
         <div class="form-group"><label>구매일</label><input type="date" id="devPurchase" /></div>
         <div class="form-group"><label>보증만료일</label><input type="date" id="devWarranty" /></div>
+        <div class="form-group full"><label>위치 (공간)</label><select id="devLocation"><option value="">없음</option></select></div>
         <div class="form-group full"><label>비고</label><input id="devNote" placeholder="메모..." /></div>
       </div>
     </div>
@@ -1041,6 +1042,7 @@
         <div class="form-group"><label>상태</label><select id="editDevStatus"><option value="대여가능">대여가능</option><option value="대여중">대여중</option><option value="수리중">수리중</option><option value="분실">분실</option></select></div>
         <div class="form-group"><label>구매일</label><input type="date" id="editDevPurchase" /></div>
         <div class="form-group"><label>보증만료일</label><input type="date" id="editDevWarranty" /></div>
+        <div class="form-group full"><label>위치 (공간)</label><select id="editDevLocation"><option value="">없음</option></select></div>
         <div class="form-group full"><label>비고</label><input id="editDevNote" /></div>
       </div>
 
@@ -2240,7 +2242,10 @@ async function confirmReturn() {
 function openDeviceModal() {
   ['devId','devName','devMaker','devModel','devLabel','devPurchase','devWarranty','devNote','devCategory'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('devStatus').value = '대여가능';
-
+  // 위치 select 채우기
+  const locSel = document.getElementById('devLocation');
+  locSel.innerHTML = '<option value="">없음</option>' + allRooms.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  locSel.value = '';
   document.getElementById('deviceModal').classList.add('open');
 }
 
@@ -2256,6 +2261,7 @@ async function saveDevice() {
     status: document.getElementById('devStatus').value,
     purchase_date: document.getElementById('devPurchase').value||null,
     warranty_date: document.getElementById('devWarranty').value||null,
+    location: document.getElementById('devLocation').value||null,
     note: document.getElementById('devNote').value,
   }]);
   if (error) { showToast('오류: '+error.message, 'error'); return; }
@@ -2532,6 +2538,10 @@ function openEditDevice(id) {
   document.getElementById('editDevPurchase').value = d.purchase_date||'';
   document.getElementById('editDevWarranty').value = d.warranty_date||'';
   document.getElementById('editDevNote').value = d.note||'';
+  // 위치 select 채우기
+  const editLocSel = document.getElementById('editDevLocation');
+  editLocSel.innerHTML = '<option value="">없음</option>' + allRooms.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  editLocSel.value = d.location||'';
 
   // 대여 정보 섹션 - 수리중/분실이면 숨기기
   const loanSection = document.getElementById('editDevLoanSection');
@@ -2573,6 +2583,7 @@ async function updateDevice() {
     status: document.getElementById('editDevStatus').value,
     purchase_date: document.getElementById('editDevPurchase').value||null,
     warranty_date: document.getElementById('editDevWarranty').value||null,
+    location: document.getElementById('editDevLocation').value||null,
     note: document.getElementById('editDevNote').value.trim(),
   }).eq('id', id);
   if (error) { showToast('오류: '+error.message, 'error'); return; }
@@ -3238,8 +3249,17 @@ function renderRoomTable(rooms, tbodyId) {
     const borrower = loan ? (loan.borrower_name || '-') : '-';
     const dueDate = loan ? (loan.due_date || '-') : '-';
     const catColor = r.category==='실습실' ? 'lent' : r.category==='도서관' ? 'available' : 'repair';
+    // 이 공간에 속한 기기 대여 내역
+    const roomDevices = allDevices.filter(d => d.location === r.id);
+    const activeRoomLoans = roomDevices.map(d => {
+      const l = allLoans.find(lo => lo.device_id === d.id && ['대여중','연체'].includes(lo.status));
+      return l ? { device: d, loan: l } : null;
+    }).filter(Boolean);
+    const devLoansHtml = activeRoomLoans.length
+      ? `<div style="margin-top:6px;font-size:12px;color:var(--text-muted)">${activeRoomLoans.map(({device,loan:l})=>`<span style="display:inline-block;margin-right:8px">💻 ${device.name} → ${l.borrower_name}</span>`).join('')}</div>`
+      : '';
     return `<tr>
-      <td style="font-weight:600">${r.name}</td>
+      <td style="font-weight:600">${r.name}${devLoansHtml}</td>
       <td><span class="badge badge-${catColor}">${r.category||'-'}</span></td>
       <td style="text-align:center">${r.capacity||'-'}</td>
       <td>${statusBadge(r.status||'사용가능')}</td>
@@ -3258,6 +3278,12 @@ function renderRoomTable(rooms, tbodyId) {
     const loan = allLoans.find(l => l.device_id === r.id && ['대여중','연체'].includes(l.status));
     const borrower = loan ? (loan.borrower_name || '-') : '-';
     const catColor = r.category==='실습실' ? 'lent' : r.category==='도서관' ? 'available' : 'repair';
+    // 이 공간에 속한 기기 대여 내역
+    const roomDevices = allDevices.filter(d => d.location === r.id);
+    const activeRoomLoans = roomDevices.map(d => {
+      const l = allLoans.find(lo => lo.device_id === d.id && ['대여중','연체'].includes(lo.status));
+      return l ? { device: d, loan: l } : null;
+    }).filter(Boolean);
     return `<div class="mobile-card">
       <div class="mobile-card-header">
         <div>
@@ -3266,8 +3292,17 @@ function renderRoomTable(rooms, tbodyId) {
         </div>
         ${statusBadge(r.status||'사용가능')}
       </div>
+      ${activeRoomLoans.length ? `
+      <div style="margin:8px 0;padding:8px;background:var(--lt-blue);border-radius:8px">
+        <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:6px">📦 대여 중인 기기 (${activeRoomLoans.length}건)</div>
+        ${activeRoomLoans.map(({device,loan:l})=>`
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.05)">
+          <span style="font-weight:600">${device.name}</span>
+          <span style="color:var(--text-muted)">${l.borrower_name} · ${l.due_date||'-'}</span>
+        </div>`).join('')}
+      </div>` : ''}
       ${loan ? `<div class="mobile-card-cols">
-        <div><div class="mobile-card-label">대여자</div><div class="mobile-card-value">${borrower}</div></div>
+        <div><div class="mobile-card-label">공간 대여자</div><div class="mobile-card-value">${borrower}</div></div>
         <div><div class="mobile-card-label">반납예정일</div><div class="mobile-card-value">${loan.due_date||'-'}</div></div>
       </div>` : ''}
       <div class="mobile-card-actions">
@@ -3277,6 +3312,7 @@ function renderRoomTable(rooms, tbodyId) {
         ${canEdit() ? `<button class="btn btn-danger btn-sm" onclick="deleteRoom('${r.id}')">삭제</button>` : ''}
       </div>
     </div>`;
+  }).join('')}</div>`;
   }).join('')}</div>`;
 }
 
