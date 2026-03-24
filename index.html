@@ -2054,10 +2054,10 @@ async function openLoanModal() {
   ['loanDeviceId','loanBorrowerId'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   ['loanDeviceSelected','loanBorrowerSelected','loanDeviceDropdown','loanBorrowerDropdown'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
 
-  // DB에서 직접 최신 대여번호 조회
+  // DB에서 최신 번호 조회 후 +1
   const { data } = await sb.from('loans').select('id').order('id', { ascending: false }).limit(1);
-  const lastId = data?.[0]?.id || '';
-  const lastNum = lastId ? (parseInt(lastId.replace(/\D/g,'')) || 0) : 0;
+  const lastId = data?.[0]?.id || 'LN-000';
+  const lastNum = parseInt(lastId.replace(/\D/g,'')) || 0;
   document.getElementById('loanId').value = 'LN-' + String(lastNum+1).padStart(3,'0');
 
   const today = new Date().toISOString().split('T')[0];
@@ -2159,15 +2159,23 @@ function quickLend(deviceId) {
 }
 
 async function saveLoan() {
-  const id = document.getElementById('loanId').value.trim();
   const deviceId = document.getElementById('loanDeviceId').value;
   const borrowerId = document.getElementById('loanBorrowerId').value;
   const borrowerName = document.getElementById('loanBorrowerName').value;
   const loanDate = document.getElementById('loanDate').value;
   const dueDate = document.getElementById('loanDueDate').value;
   const note = document.getElementById('loanNote').value;
-  if (!id||!deviceId||!borrowerId||!loanDate||!dueDate) { showToast('필수 항목을 모두 입력해주세요', 'error'); return; }
-  const { error: loanErr } = await sb.from('loans').insert([{ id, device_id:deviceId, borrower_id:borrowerId, borrower_name:borrowerName, loan_date:loanDate, due_date:dueDate, status:'대여중', note }]);
+  const isStudent = allStudents.some(s => s.id === borrowerId);
+  if (!deviceId||!borrowerId||!loanDate) { showToast('필수 항목을 모두 입력해주세요', 'error'); return; }
+  if (isStudent && !dueDate) { showToast('학생 대여는 반납예정일이 필수예요', 'error'); return; }
+
+  // DB에서 최신 번호 조회 후 +1
+  const { data: latestData } = await sb.from('loans').select('id').order('id', { ascending: false }).limit(1);
+  const latestId = latestData?.[0]?.id || 'LN-000';
+  const lastNum = parseInt(latestId.replace(/\D/g,'')) || 0;
+  const id = 'LN-' + String(lastNum + 1).padStart(3,'0');
+
+  const { error: loanErr } = await sb.from('loans').insert([{ id, device_id:deviceId, borrower_id:borrowerId, borrower_name:borrowerName, loan_date:loanDate||null, due_date:dueDate||null, status:'대여중', note }]);
   if (loanErr) { showToast('오류: '+loanErr.message, 'error'); return; }
   const loanIsRoom = allRooms.some(r=>r.id===deviceId);
   if (loanIsRoom) { await sb.from('rooms').update({ status:'사용중' }).eq('id', deviceId); }
@@ -3073,8 +3081,8 @@ async function saveQuickLoan() {
   const dueDate = document.getElementById('quickDueDate').value;
   if (!quickLoanDeviceId||!borrowerId||!dueDate) { showToast('기기·대여자·반납예정일을 모두 선택해주세요', 'error'); return; }
   const { data } = await sb.from('loans').select('id').order('id', { ascending: false }).limit(1);
-  const lastIdStr = data?.[0]?.id || '';
-  const lastId = lastIdStr ? (parseInt(lastIdStr.replace(/\D/g,'')) || 0) : 0;
+  const lastIdStr = data?.[0]?.id || 'LN-000';
+  const lastId = parseInt(lastIdStr.replace(/\D/g,'')) || 0;
   const id = 'LN-' + String(lastId+1).padStart(3,'0');
   const loanDate = new Date().toISOString().split('T')[0];
   const { error } = await sb.from('loans').insert([{ id, device_id:quickLoanDeviceId, borrower_id:borrowerId, borrower_name:borrowerName, loan_date:loanDate, due_date:dueDate, status:'대여중' }]);
