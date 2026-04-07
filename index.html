@@ -1023,14 +1023,14 @@ let returningLoanId = null;
 
 // ── Init ──────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  const url = localStorage.getItem(SUPABASE_URL_KEY);
-  const key = localStorage.getItem(SUPABASE_KEY_KEY);
-  if (url && key) {
-    initApp(url, key);
-  } else {
-    document.getElementById('configScreen').style.display = 'flex';
-  }
+  const url = 'https://pmkiptssekzyardupqvl.supabase.co';
+  const key = 'sb_publishable_8zU3M6zHww5Ru_Vs0gyt3g_yBMa5m5l';
+  localStorage.setItem(SUPABASE_URL_KEY, url);
+  localStorage.setItem(SUPABASE_KEY_KEY, key);
+  initApp(url, key);
 });
+
+
 
 // ✅ 수정된 connectSupabase: 실제 DB 연결 테스트 포함
 async function connectSupabase() {
