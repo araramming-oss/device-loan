@@ -1733,11 +1733,15 @@ function selectLoanDevice(id, name, category) {
 
 function searchLoanBorrower(q) {
   const dd = document.getElementById('loanBorrowerDropdown');
-  const all = [...allStudents.filter(s=>s.status==='재학').map(s=>({...s,type:'학생'})), ...allStaff.map(s=>({...s,type:s.role||'교직원'}))];
+  const all = [
+    ...allStudents.filter(s=>s.status==='재학').map(s=>({...s,type:'학생'})),
+    ...allStaff.map(s=>({...s,type:s.role||'교직원'})),
+    ...allRooms.map(r=>({id:r.id, name:r.name, type:r.category||'공간'}))
+  ];
   const filtered = q ? all.filter(p=>[p.id,p.name,p.class_info].some(v=>(v||'').toLowerCase().includes(q.toLowerCase()))) : all.slice(0,20);
   dd.innerHTML = filtered.slice(0,50).map(p =>
     `<div class="search-dropdown-item" onclick="selectLoanBorrower('${p.id}','${(p.name||'').replace(/'/g,"\\'")}','${p.type}')">
-      <span style="font-family:monospace;font-size:12px;color:var(--text-muted);margin-right:8px">${p.id}</span><span style="font-weight:600">${p.name}</span>
+      <span style="font-family:monospace;font-size:12px;color:var(--text-muted);margin-right:8px">${p.id}</span><span style="font-weight:600">${p.name}</span><span style="font-size:11px;color:var(--text-muted);margin-left:6px">${p.type}</span>
     </div>`
   ).join('') || '<div class="search-dropdown-item" style="color:var(--text-muted)">검색 결과 없음</div>';
   dd.style.display = 'block';
