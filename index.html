@@ -2144,7 +2144,7 @@ function openNoticeModal() {
     const lines = items.map(({ loan, stu }) => {
       const dev = allDevices.find(d => d.id === loan.device_id);
       const dday = Math.ceil((new Date(loan.due_date) - today) / 86400000);
-      return `• ${stu?.name||loan.borrower_name} - ${dev?.name||loan.device_id} (${loan.due_date}, ${dday===0?'오늘 반납':'D-'+dday})`;
+      return `• ${stu?.name||loan.borrower_name}`;
     }).join('\n');
     const fullText = `[${cls} 담임선생님]\n안녕하세요! 기기 반납 안내드립니다 🙏\n아래 학생들의 기기 반납을 부탁드립니다.\n\n${lines}`;
     const safeId = cls.replace(/\s/g,'_');
