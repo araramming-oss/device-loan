@@ -1006,7 +1006,10 @@
   <div class="modal" style="width:600px">
     <div class="modal-header"><div class="modal-title">📢 반납 공지 생성 (D-14일 이내 + 연체)</div><button class="modal-close" onclick="closeModal('noticeModal')">×</button></div>
     <div class="modal-body"><div id="noticeContent"></div></div>
-    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('noticeModal')">닫기</button></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('noticeModal')">닫기</button>
+      <button class="btn btn-primary" onclick="downloadNoticeExcel()">📥 엑셀 다운로드</button>
+    </div>
   </div>
 </div>
 
@@ -2129,6 +2132,58 @@ async function deleteLoan(loanId, deviceId, status) {
   showToast('삭제 완료', 'success'); await loadAll(); renderPage(currentPage);
 }
 async function deleteRoom(id) { if (!confirm(`공간 "${id}"를 삭제하시겠어요?`)) return; await sb.from('rooms').delete().eq('id', id); showToast('삭제 완료', 'success'); await loadRooms(); renderPage(currentPage); }
+
+function downloadNoticeExcel() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d14 = new Date(today); d14.setDate(d14.getDate() + 14);
+
+  const target = allLoans.filter(l => {
+    if (!['대여중','연체'].includes(l.status)) return false;
+    if (l.status === '연체') return true;
+    if (!l.due_date) return false;
+    const due = new Date(l.due_date); due.setHours(0,0,0,0);
+    return due >= today && due <= d14;
+  }).filter(l => allStudents.some(s => s.id === l.borrower_id));
+
+  // 반별로 묶기
+  const byClass = {};
+  target.forEach(l => {
+    const stu = allStudents.find(s => s.id === l.borrower_id);
+    const cls = stu?.class_info || '미분류';
+    if (!byClass[cls]) byClass[cls] = [];
+    byClass[cls].push({ loan: l, stu });
+  });
+
+  const sortedClasses = Object.keys(byClass).sort((a, b) => a.localeCompare(b, 'ko'));
+
+  // CSV 데이터 생성
+  const rows = [['반', '이름', '기기명', '반납예정일', '상태']];
+  sortedClasses.forEach(cls => {
+    byClass[cls].forEach(({ loan, stu }, idx) => {
+      const dev = allDevices.find(d => d.id === loan.device_id);
+      rows.push([
+        idx === 0 ? cls : '',
+        stu?.name || loan.borrower_name,
+        dev?.name || loan.device_id,
+        loan.due_date || '-',
+        loan.status === '연체' ? '연체중' : '대여중'
+      ]);
+    });
+    rows.push(['', '', '', '', '']); // 반 사이 빈 줄
+  });
+
+  // CSV 변환 및 다운로드
+  const csvContent = '\uFEFF' + rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const dateStr = new Date().toISOString().split('T')[0];
+  a.download = `반납공지_${dateStr}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('엑셀 파일 다운로드 완료! ✅', 'success');
+}
 
 // ── 반납 공지 ─────────────────────────────────────────────────
 function openNoticeModal() {
