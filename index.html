@@ -2213,6 +2213,7 @@ function openNoticeModal() {
     const items = byClass[cls];
     const lines = items.map(({ loan, stu }) => {
       const dev = allDevices.find(d => d.id === loan.device_id);
+      const devName = dev?.name || loan.device_id;
       const dday = Math.ceil((new Date(loan.due_date) - today) / 86400000);
       return `• ${stu?.name || loan.borrower_name} - ${devName}${loan.status === '연체' ? ' (연체 중)' : ''}`;
     }).join('\n');
