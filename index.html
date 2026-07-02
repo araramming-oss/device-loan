@@ -484,6 +484,7 @@
             <option value="">전체 상태</option><option value="대여중">대여 중</option><option value="연체">연체</option><option value="반납완료">반납 완료</option>
           </select>
           <button class="btn btn-outline" onclick="openNoticeModal()" style="white-space:nowrap">📢 반납 공지 생성</button>
+          <button class="btn btn-outline" onclick="openStaffNoticeModal()" style="white-space:nowrap">👩‍🏫 교직원 확인 공지</button>
         </div>
         <div class="card"><div class="table-wrap"><table>
           <thead><tr><th>대여번호</th><th>기기ID</th><th>대여자</th><th>대여일</th><th>반납예정일</th><th>상태</th><th>반납일</th><th>연체일수</th><th></th></tr></thead>
@@ -1009,6 +1010,23 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('noticeModal')">닫기</button>
       <button class="btn btn-primary" onclick="downloadNoticeExcel()">📥 엑셀 다운로드</button>
+    </div>
+  </div>
+</div>
+
+<!-- 교직원 확인 공지 모달 -->
+<div class="modal-overlay" id="staffNoticeModal">
+  <div class="modal" style="width:640px">
+    <div class="modal-header">
+      <div class="modal-title">👩‍🏫 교직원 기기 보유 확인 공지</div>
+      <button class="modal-close" onclick="closeModal('staffNoticeModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="staffNoticeContent"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('staffNoticeModal')">닫기</button>
+      <button class="btn btn-primary" onclick="downloadStaffNoticeExcel()">📥 엑셀 다운로드</button>
     </div>
   </div>
 </div>
@@ -2180,6 +2198,96 @@ function downloadNoticeExcel() {
   a.href = url;
   const dateStr = new Date().toISOString().split('T')[0];
   a.download = `반납공지_${dateStr}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('엑셀 파일 다운로드 완료! ✅', 'success');
+}
+
+// ── 교직원 확인 공지 ─────────────────────────────────────────────────
+function openStaffNoticeModal() {
+  // 교직원 대여중/연체 내역
+  const staffLoans = allLoans.filter(l =>
+    ['대여중','연체'].includes(l.status) &&
+    allStaff.some(s => s.id === l.borrower_id)
+  );
+
+  const container = document.getElementById('staffNoticeContent');
+  if (!staffLoans.length) {
+    container.innerHTML = `<div class="empty" style="padding:30px;text-align:center;color:var(--text-muted)"><div style="font-size:32px;margin-bottom:8px">✅</div><p>대여 중인 교직원이 없어요</p></div>`;
+    document.getElementById('staffNoticeModal').classList.add('open');
+    return;
+  }
+
+  // 교직원별로 묶기
+  const byStaff = {};
+  staffLoans.forEach(l => {
+    const stf = allStaff.find(s => s.id === l.borrower_id);
+    const name = stf?.name || l.borrower_name;
+    if (!byStaff[name]) byStaff[name] = [];
+    byStaff[name].push({ loan: l, stf });
+  });
+
+  const sortedStaff = Object.keys(byStaff).sort((a, b) => a.localeCompare(b, 'ko'));
+
+  container.innerHTML = sortedStaff.map(name => {
+    const items = byStaff[name];
+    const lines = items.map(({ loan }) => {
+      const dev = allDevices.find(d => d.id === loan.device_id);
+      const devName = dev?.name || loan.device_id;
+      return `• ${devName}${loan.status === '연체' ? ' (연체 중)' : ''}`;
+    }).join('\n');
+
+    const fullText = `[${name} 선생님]\n안녕하세요! 기기 보유 확인 안내드립니다 🙏\n현재 아래 기기를 보유 중이신 것으로 확인됩니다.\n기기를 정상적으로 보유 중이신지 확인 부탁드립니다.\n\n${lines}`;
+
+    const safeId = name.replace(/\s/g,'_');
+    return `<div style="margin-bottom:16px;padding:16px;background:var(--gray);border-radius:10px;border:1px solid var(--mid-gray)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy)">${name} 선생님 <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(${items.length}건)</span></div>
+        <button class="btn btn-primary btn-sm" onclick="copyNotice('staffnotice_${safeId}')">📋 복사</button>
+      </div>
+      <textarea id="staffnotice_${safeId}" readonly style="width:100%;height:130px;font-size:13px;font-family:inherit;border:1px solid var(--mid-gray);border-radius:8px;padding:10px;background:white;resize:none;line-height:1.6">${fullText}</textarea>
+    </div>`;
+  }).join('');
+
+  document.getElementById('staffNoticeModal').classList.add('open');
+}
+
+function downloadStaffNoticeExcel() {
+  const staffLoans = allLoans.filter(l =>
+    ['대여중','연체'].includes(l.status) &&
+    allStaff.some(s => s.id === l.borrower_id)
+  );
+
+  const rows = [['이름', '기기명', '대여일', '반납예정일', '상태']];
+  const byStaff = {};
+  staffLoans.forEach(l => {
+    const stf = allStaff.find(s => s.id === l.borrower_id);
+    const name = stf?.name || l.borrower_name;
+    if (!byStaff[name]) byStaff[name] = [];
+    byStaff[name].push({ loan: l, stf });
+  });
+
+  Object.keys(byStaff).sort((a,b) => a.localeCompare(b,'ko')).forEach(name => {
+    byStaff[name].forEach(({ loan }, idx) => {
+      const dev = allDevices.find(d => d.id === loan.device_id);
+      rows.push([
+        idx === 0 ? name : '',
+        dev?.name || loan.device_id,
+        loan.loan_date || '-',
+        loan.due_date || '-',
+        loan.status === '연체' ? '연체중' : '대여중'
+      ]);
+    });
+    rows.push(['', '', '', '', '']);
+  });
+
+  const csvContent = '\uFEFF' + rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const dateStr = new Date().toISOString().split('T')[0];
+  a.download = `교직원대여현황_${dateStr}.csv`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('엑셀 파일 다운로드 완료! ✅', 'success');
