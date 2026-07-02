@@ -1004,7 +1004,7 @@
 
 <div class="modal-overlay" id="noticeModal">
   <div class="modal" style="width:600px">
-    <div class="modal-header"><div class="modal-title">📢 반납 공지 생성 (D-14일 이내)</div><button class="modal-close" onclick="closeModal('noticeModal')">×</button></div>
+    <div class="modal-header"><div class="modal-title">📢 반납 공지 생성 (D-14일 이내 + 연체)</div><button class="modal-close" onclick="closeModal('noticeModal')">×</button></div>
     <div class="modal-body"><div id="noticeContent"></div></div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('noticeModal')">닫기</button></div>
   </div>
@@ -2135,9 +2135,11 @@ function openNoticeModal() {
   const today = new Date(); today.setHours(0,0,0,0);
   const d14 = new Date(today); d14.setDate(d14.getDate() + 14);
   const target = allLoans.filter(l => {
-    if (!['대여중','연체'].includes(l.status) || !l.due_date) return false;
+    if (!['대여중','연체'].includes(l.status)) return false;
+    if (l.status === '연체') return true; // 연체는 무조건 포함
+    if (!l.due_date) return false;
     const due = new Date(l.due_date); due.setHours(0,0,0,0);
-    return due >= today && due <= d14;
+    return due >= today && due <= d14; // 대여중은 D-14일 이내
   }).filter(l => allStudents.some(s => s.id === l.borrower_id));
   const byClass = {};
   target.forEach(l => {
@@ -2157,7 +2159,7 @@ function openNoticeModal() {
     const lines = items.map(({ loan, stu }) => {
       const dev = allDevices.find(d => d.id === loan.device_id);
       const dday = Math.ceil((new Date(loan.due_date) - today) / 86400000);
-      return `• ${stu?.name||loan.borrower_name} - ${dev?.name||loan.device_id}`;
+      return `• ${stu?.name || loan.borrower_name} - ${devName}${loan.status === '연체' ? ' (연체 중)' : ''}`;
     }).join('\n');
     const fullText = `[${cls} 담임선생님]\n안녕하세요! 기기 반납 안내드립니다 🙏\n아래 학생들의 기기 반납을 부탁드립니다.\n\n${lines}`;
     const safeId = cls.replace(/\s/g,'_');
