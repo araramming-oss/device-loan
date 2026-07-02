@@ -1172,7 +1172,20 @@ function closeSidebar() { document.getElementById('sidebar').classList.remove('o
 
 async function loadAll() {
   await Promise.all([loadDevices(), loadLoans(), loadStudents(), loadStaff(), loadRooms()]);
+  await autoMarkOverdue();
   renderDashboard();
+}
+
+async function autoMarkOverdue() {
+  const today = new Date().toISOString().split('T')[0];
+  const overdueLoans = allLoans.filter(l =>
+    l.status === '대여중' && l.due_date && l.due_date < today
+  );
+  if (!overdueLoans.length) return;
+  const ids = overdueLoans.map(l => l.id);
+  await sb.from('loans').update({ status: '연체' }).in('id', ids);
+  // 로컬 데이터도 업데이트
+  allLoans = allLoans.map(l => ids.includes(l.id) ? { ...l, status: '연체' } : l);
 }
 
 async function loadDevices() {
