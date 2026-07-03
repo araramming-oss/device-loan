@@ -1031,6 +1031,22 @@
   </div>
 </div>
 
+<!-- 기기 대여 이력 모달 -->
+<div class="modal-overlay" id="deviceHistoryModal">
+  <div class="modal" style="width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="deviceHistoryTitle">📋 대여 이력</div>
+      <button class="modal-close" onclick="closeModal('deviceHistoryModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="deviceHistoryContent"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('deviceHistoryModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1187,6 +1203,38 @@ function applyRoleUI() {
 
 function canEdit() { return currentUser && currentUser.role !== '조회자'; }
 function canAdmin() { return currentUser && currentUser.role === '관리자'; }
+
+function openDeviceHistory(deviceId, deviceName) {
+  document.getElementById('deviceHistoryTitle').textContent = `📋 ${deviceName} 대여 이력`;
+  const history = allLoans
+    .filter(l => l.device_id === deviceId)
+    .sort((a, b) => (b.loan_date||'').localeCompare(a.loan_date||''));
+
+  const container = document.getElementById('deviceHistoryContent');
+  if (!history.length) {
+    container.innerHTML = `<div class="empty" style="padding:30px;text-align:center;color:var(--text-muted)"><div style="font-size:32px;margin-bottom:8px">📋</div><p>대여 이력이 없어요</p></div>`;
+    document.getElementById('deviceHistoryModal').classList.add('open');
+    return;
+  }
+
+  container.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>대여번호</th><th>대여자</th><th>대여일</th><th>반납예정일</th><th>반납일</th><th>상태</th></tr></thead>
+    <tbody>${history.map(l => {
+      const stu = allStudents.find(s => s.id === l.borrower_id);
+      const stf = allStaff.find(s => s.id === l.borrower_id);
+      const borrowerInfo = stu ? `${l.borrower_name}<br><span style="font-size:11px;color:var(--text-muted)">${stu.class_info||''}</span>` : l.borrower_name;
+      return `<tr>
+        <td style="font-size:12px">${l.id}</td>
+        <td style="font-weight:600">${borrowerInfo}</td>
+        <td>${l.loan_date||'-'}</td>
+        <td>${l.due_date||'-'}</td>
+        <td>${l.return_date||'-'}</td>
+        <td>${statusBadge(l.status)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+  document.getElementById('deviceHistoryModal').classList.add('open');
+}
 
 function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebarBackdrop').classList.add('open'); }
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarBackdrop').classList.remove('open'); }
@@ -1390,6 +1438,7 @@ function renderDeviceTable(devices, tbodyId, showCategory) {
         ${['대여중','연체'].includes(d.status) && canEdit() ? `<button class="btn btn-success btn-sm" data-lid="${loan?.id||''}" data-did="${d.id}" data-name="${d.name}" data-borrower="${borrower}" onclick="openReturnByDevice(this)">반납</button>` : ''}
         ${canEdit() ? `<button class="btn btn-outline btn-sm" data-id="${d.id}" onclick="openEditDevice(this.dataset.id)">수정</button>` : ''}
         ${canDelete && canEdit() ? `<button class="btn btn-danger btn-sm" data-id="${d.id}" onclick="deleteDevice(this.dataset.id)">삭제</button>` : ''}
+        <button class="btn btn-outline btn-sm" onclick="openDeviceHistory('${d.id}','${d.name}')">이력</button>
       </td>
     </tr>`;
   }).join('');
@@ -1411,6 +1460,7 @@ function renderDeviceTable(devices, tbodyId, showCategory) {
         ${d.status==='대여가능'?`<button class="btn btn-primary btn-sm" onclick="quickLend('${d.id}')">대여</button>`:''}
         ${['대여중','연체'].includes(d.status)?`<button class="btn btn-success btn-sm" data-lid="${loan?.id||''}" data-did="${d.id}" data-name="${d.name}" data-borrower="${borrower}" onclick="openReturnByDevice(this)">반납</button>`:''}
         <button class="btn btn-outline btn-sm" onclick="openEditDevice('${d.id}')">수정</button>
+        <button class="btn btn-outline btn-sm" onclick="openDeviceHistory('${d.id}','${d.name}')">이력</button>
         ${canDelete?`<button class="btn btn-danger btn-sm" onclick="deleteDevice('${d.id}')">삭제</button>`:''}
       </div>`:''}
     </div>`;
