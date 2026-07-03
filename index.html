@@ -67,6 +67,8 @@
   .btn-primary:hover { background: #1557B0; }
   .btn-success { background: var(--green); color: white; }
   .btn-success:hover { background: #166038; }
+  .btn-warning { background: #C77700; color: white; }
+  .btn-warning:hover { background: #A96400; }
   .btn-danger { background: var(--red); color: white; }
   .btn-danger:hover { opacity: 0.85; }
   .btn-outline { background: white; color: var(--dark); border: 1px solid var(--mid-gray); }
@@ -989,6 +991,33 @@
   </div>
 </div>
 
+
+<div class="modal-overlay" id="extendLoanModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header"><div class="modal-title">📅 반납 연장</div><button class="modal-close" onclick="closeModal('extendLoanModal')">×</button></div>
+    <div class="modal-body">
+      <div id="extendLoanInfo" style="background:var(--lt-blue);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.9;margin-bottom:14px"></div>
+      <div class="form-group full">
+        <label>새 반납예정일 (달력에서 선택)</label>
+        <input type="date" id="extendNewDue" onchange="updateExtendPreview()" />
+      </div>
+      <div class="form-group full">
+        <label>빠른 선택 (현재 예정일 기준)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-outline" style="padding:6px 12px" onclick="quickExtend(7)">+7일</button>
+          <button type="button" class="btn btn-outline" style="padding:6px 12px" onclick="quickExtend(14)">+14일</button>
+          <button type="button" class="btn btn-outline" style="padding:6px 12px" onclick="quickExtend(30)">+30일</button>
+        </div>
+      </div>
+      <div id="extendPreview" style="margin-top:6px;font-size:13px;font-weight:600;color:var(--green)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('extendLoanModal')">취소</button>
+      <button class="btn btn-primary" onclick="confirmExtendLoan()">연장 저장</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="returnModal">
   <div class="modal" style="width:360px">
     <div class="modal-header"><div class="modal-title">📤 반납 처리</div><button class="modal-close" onclick="closeModal('returnModal')">×</button></div>
@@ -1218,7 +1247,7 @@ function openDeviceHistory(deviceId, deviceName) {
   }
 
   container.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>대여번호</th><th>대여자</th><th>대여일</th><th>반납예정일</th><th>반납일</th><th>상태</th></tr></thead>
+    <thead><tr><th>대여번호</th><th>대여자</th><th>대여일</th><th>반납예정일</th><th>반납일</th><th>상태</th><th>연장</th></tr></thead>
     <tbody>${history.map(l => {
       const stu = allStudents.find(s => s.id === l.borrower_id);
       const stf = allStaff.find(s => s.id === l.borrower_id);
@@ -1230,6 +1259,7 @@ function openDeviceHistory(deviceId, deviceName) {
         <td>${l.due_date||'-'}</td>
         <td>${l.return_date||'-'}</td>
         <td>${statusBadge(l.status)}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${((l.note||'').match(/\[연장 \d+회\]/g)?.length||0) ? ((l.note||'').match(/\[연장 \d+회\]/g).length + '회') : '-'}</td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -1489,6 +1519,7 @@ function renderLoanTable(loans, tbodyId) {
       <td style="color:${days>0?'var(--red)':'inherit'};font-weight:${days>0?700:400}">${days>0?days+'일':'-'}</td>
       <td style="white-space:nowrap;display:flex;gap:4px;">
         ${l.status!=='반납완료' && canEdit()?`<button class="btn btn-success btn-sm" onclick="openReturnModal('${l.id}','${l.borrower_name}','${l.device_id}')">반납</button>`:''}
+        ${l.status!=='반납완료' && canEdit()?`<button class="btn btn-warning btn-sm" data-id="${l.id}" onclick="extendLoan(this.dataset.id)">연장</button>`:''}
         ${canEdit()?`<button class="btn btn-outline btn-sm" data-id="${l.id}" onclick="openEditLoan(this.dataset.id)">수정</button>`:''}
         ${canEdit()?`<button class="btn btn-danger btn-sm" onclick="deleteLoan('${l.id}','${l.device_id}','${l.status}')">삭제</button>`:''}
       </td>
@@ -1509,6 +1540,7 @@ function renderLoanTable(loans, tbodyId) {
       </div>
       ${canEdit()?`<div class="mobile-card-actions">
         ${l.status!=='반납완료'?`<button class="btn btn-success btn-sm" onclick="openReturnModal('${l.id}','${l.borrower_name}','${l.device_id}')">반납</button>`:''}
+        ${l.status!=='반납완료'?`<button class="btn btn-warning btn-sm" onclick="extendLoan('${l.id}')">연장</button>`:''}
         <button class="btn btn-outline btn-sm" onclick="openEditLoan('${l.id}')">수정</button>
         <button class="btn btn-danger btn-sm" onclick="deleteLoan('${l.id}','${l.device_id}','${l.status}')">삭제</button>
       </div>`:''}
@@ -2141,6 +2173,104 @@ function selectEditDevBorrower(id, name) {
   const sel = document.getElementById('editDevBorrowerSelected');
   sel.textContent = `✓ ${name}${id !== name ? ` (${id})` : ''}`;
   sel.style.background = 'var(--lt-green)'; sel.style.color = 'var(--green)';
+}
+
+let extendTargetLoanId = null;
+
+// 연장 버튼 클릭 -> 날짜 선택 모달 열기 (대여중/연체 모두 가능, 횟수 무제한)
+function extendLoan(loanId) {
+  const loan = allLoans.find(l => String(l.id) === String(loanId));
+  if (!loan) { showToast('대여 정보를 찾을 수 없어요', 'error'); return; }
+  if (loan.status === '반납완료') { showToast('이미 반납된 건은 연장할 수 없어요', 'error'); return; }
+
+  extendTargetLoanId = loanId;
+
+  // 지금까지 연장 횟수 (메모 기록 기반, 제한 없음 - 표시용)
+  const prevCount = (loan.note || '').match(/\[연장 \d+회\]/g)?.length || 0;
+
+  // 기본값: 기존 반납예정일 +7일 (일찍/늦게 와도 예정일 기준)
+  const base = loan.due_date ? new Date(loan.due_date) : new Date();
+  base.setDate(base.getDate() + 7);
+  const defaultDue = base.toISOString().slice(0, 10);
+
+  const dueInput = document.getElementById('extendNewDue');
+  dueInput.value = defaultDue;
+  // 기존 예정일 이전으로는 못 고르게 최소값 지정
+  dueInput.min = loan.due_date || new Date().toISOString().slice(0, 10);
+
+  const statusText = loan.status === '연체'
+    ? '<b style="color:var(--red)">연체 중</b> (연장하면 대여중으로 정상화돼요)'
+    : '대여 중';
+  document.getElementById('extendLoanInfo').innerHTML =
+    '<div>기기/공간: <b>' + (loan.device_id || '-') + '</b></div>' +
+    '<div>대여자: <b>' + (loan.borrower_name || loan.borrower_id || '-') + '</b></div>' +
+    '<div>현재 반납예정일: <b>' + (loan.due_date || '-') + '</b></div>' +
+    '<div>상태: ' + statusText + '</div>' +
+    '<div>지금까지 연장: <b>' + prevCount + '회</b> (제한 없음)</div>';
+
+  updateExtendPreview();
+  document.getElementById('extendLoanModal').classList.add('open');
+}
+
+// 빠른 선택 버튼: 기존 반납예정일 기준 +N일
+function quickExtend(days) {
+  const loan = allLoans.find(l => String(l.id) === String(extendTargetLoanId));
+  if (!loan) return;
+  const base = loan.due_date ? new Date(loan.due_date) : new Date();
+  base.setDate(base.getDate() + days);
+  document.getElementById('extendNewDue').value = base.toISOString().slice(0, 10);
+  updateExtendPreview();
+}
+
+// 선택한 날짜 미리보기 (며칠 연장되는지)
+function updateExtendPreview() {
+  const loan = allLoans.find(l => String(l.id) === String(extendTargetLoanId));
+  const el = document.getElementById('extendPreview');
+  const newDue = document.getElementById('extendNewDue').value;
+  if (!loan || !newDue) { el.textContent = ''; return; }
+  const oldDue = loan.due_date;
+  if (oldDue) {
+    const diff = Math.round((new Date(newDue) - new Date(oldDue)) / 86400000);
+    el.textContent = oldDue + ' → ' + newDue + '  (' + (diff >= 0 ? '+' + diff : diff) + '일)';
+  } else {
+    el.textContent = '새 반납예정일: ' + newDue;
+  }
+}
+
+// 연장 저장
+async function confirmExtendLoan() {
+  const loan = allLoans.find(l => String(l.id) === String(extendTargetLoanId));
+  if (!loan) { showToast('대여 정보를 찾을 수 없어요', 'error'); return; }
+
+  const newDue = document.getElementById('extendNewDue').value;
+  if (!newDue) { showToast('반납예정일을 선택해주세요', 'error'); return; }
+  if (loan.due_date && new Date(newDue) < new Date(loan.due_date)) {
+    showToast('기존 반납예정일보다 이전 날짜는 선택할 수 없어요', 'error'); return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const prevCount = (loan.note || '').match(/\[연장 \d+회\]/g)?.length || 0;
+  const count = prevCount + 1;
+  const log = '[연장 ' + count + '회] ' + (loan.due_date || '-') + ' → ' + newDue + ' (' + today + ')';
+  const newNote = (loan.note ? loan.note + '\n' : '') + log;
+
+  const { error } = await sb.from('loans').update({
+    due_date: newDue,
+    status: '대여중',      // 연체였다면 대여중으로 정상화
+    return_date: null,
+    note: newNote
+  }).eq('id', loan.id);
+  if (error) { showToast('오류: ' + error.message, 'error'); return; }
+
+  // 기기/공간 상태도 정상화
+  const isRoom = allRooms.some(r => r.id === loan.device_id);
+  const table = isRoom ? 'rooms' : 'devices';
+  await sb.from(table).update({ status: isRoom ? '사용중' : '대여중' }).eq('id', loan.device_id);
+
+  closeModal('extendLoanModal');
+  showToast('연장 완료! 새 반납예정일 ' + newDue + ' 📅', 'success');
+  extendTargetLoanId = null;
+  await loadAll(); renderPage(currentPage); renderDashboard();
 }
 
 async function updateLoan() {
